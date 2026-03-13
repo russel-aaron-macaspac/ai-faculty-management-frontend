@@ -1,0 +1,122 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import { 
+  LayoutDashboard, 
+  Users, 
+  UserSquare2, 
+  Calendar, 
+  Clock, 
+  FileCheck2, 
+  BrainCircuit, 
+  BarChart3,
+  LogOut,
+  Settings
+} from 'lucide-react';
+import { User } from '@/types/user';
+
+import { useRouter } from 'next/navigation';
+import { authService } from '@/services/authService';
+
+interface SidebarProps {
+  user: User | null;
+}
+
+export function Sidebar({ user }: SidebarProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  // Admin Links
+  const adminLinks = [
+    { href: '/dashboard/admin', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/faculty', label: 'Faculty Management', icon: Users },
+    { href: '/staff', label: 'Staff Management', icon: UserSquare2 },
+    { href: '/schedules', label: 'Scheduling', icon: Calendar },
+    { href: '/attendance', label: 'Attendance Monitoring', icon: Clock },
+    { href: '/clearance', label: 'Clearance Compliance', icon: FileCheck2 },
+    { href: '/reports', label: 'Reports', icon: BarChart3 },
+  ];
+
+  // Faculty Links
+  const facultyLinks = [
+    { href: '/dashboard/faculty', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '#', label: 'My Profile', icon: UserSquare2 },
+    { href: '/schedules', label: 'My Schedule', icon: Calendar },
+    { href: '/attendance', label: 'Attendance', icon: Clock },
+    { href: '/clearance', label: 'Clearance Status', icon: FileCheck2 },
+  ];
+
+  // Staff Links
+  const staffLinks = [
+    { href: '/dashboard/staff', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '#', label: 'My Profile', icon: UserSquare2 },
+    { href: '/schedules', label: 'Work Schedule', icon: Calendar },
+    { href: '/attendance', label: 'Attendance', icon: Clock },
+    { href: '/clearance', label: 'HR Compliance', icon: FileCheck2 },
+  ];
+
+  let links = adminLinks;
+  if (user?.role === 'faculty') links = facultyLinks;
+  if (user?.role === 'staff') links = staffLinks;
+
+  const handleLogout = async () => {
+    await authService.logout();
+    localStorage.removeItem('user');
+    router.push('/login');
+  };
+
+  return (
+    <div className="flex h-full w-64 flex-col bg-slate-900 text-white shadow-xl transition-all duration-300">
+      <div className="flex h-16 items-center px-6 border-b border-slate-800">
+        <BrainCircuit className="h-6 w-6 text-red-400 mr-2" />
+        <span className="text-lg font-bold tracking-tight">AI Faculty Sys</span>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto py-4">
+        <nav className="flex flex-col space-y-1 px-3">
+          {links.map((link) => {
+            const Icon = link.icon;
+            const isActive = pathname === link.href || (pathname.startsWith(link.href) && link.href !== '/dashboard' && link.href !== '#');
+            return (
+              <Link
+                key={link.label}
+                href={link.href}
+                className={cn(
+                  'flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  isActive 
+                    ? 'bg-red-600/10 text-red-400' 
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                )}
+              >
+                <Icon className={cn('mr-3 h-5 w-5', isActive ? 'text-red-400' : 'text-slate-400')} />
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+      
+      <div className="border-t border-slate-800 p-4 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-slate-800 flex items-center justify-center text-red-400 font-bold border border-slate-700">
+            {user?.name.charAt(0) || 'U'}
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">{user?.name}</span>
+            <span className="text-xs text-slate-400 capitalize">{user?.role}</span>
+          </div>
+        </div>
+        
+        <button 
+          onClick={handleLogout}
+          className="flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-slate-300 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"
+        >
+          <LogOut className="mr-3 h-5 w-5" />
+          Sign Out
+        </button>
+      </div>
+    </div>
+  );
+}
