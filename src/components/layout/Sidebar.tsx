@@ -42,7 +42,7 @@ export function Sidebar({ user }: SidebarProps) {
   // Faculty Links
   const facultyLinks = [
     { href: '/dashboard/faculty', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '#', label: 'My Profile', icon: UserSquare2 },
+    { href: '/dashboard/profile', label: 'My Profile', icon: UserSquare2 },
     { href: '/schedules', label: 'My Schedule', icon: Calendar },
     { href: '/attendance', label: 'Attendance', icon: Clock },
     { href: '/clearance', label: 'Clearance Status', icon: FileCheck2 },
@@ -51,7 +51,7 @@ export function Sidebar({ user }: SidebarProps) {
   // Staff Links
   const staffLinks = [
     { href: '/dashboard/staff', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '#', label: 'My Profile', icon: UserSquare2 },
+    { href: '/dashboard/profile', label: 'My Profile', icon: UserSquare2 },
     { href: '/schedules', label: 'Work Schedule', icon: Calendar },
     { href: '/attendance', label: 'Attendance', icon: Clock },
     { href: '/clearance', label: 'HR Compliance', icon: FileCheck2 },
