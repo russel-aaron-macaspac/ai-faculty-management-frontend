@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function RFIDAttendancePage() {
   const stats = {
     totalScans: 24,
@@ -7,6 +9,12 @@ export default function RFIDAttendancePage() {
 
   return (
     <div style={{ padding: "24px" }}>
+      <div style={{ marginBottom: "16px" }}>
+        <Link href="/attendance" style={backButtonStyle}>
+          ← Back to Attendance
+        </Link>
+      </div>
+
       <h1 style={{ fontSize: "28px", fontWeight: "bold" }}>
         RFID Attendance Dashboard
       </h1>
@@ -61,4 +69,17 @@ const cardStyle: React.CSSProperties = {
 const numberStyle: React.CSSProperties = {
   fontSize: "30px",
   fontWeight: "bold",
+};
+
+const backButtonStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "8px",
+  padding: "8px 12px",
+  borderRadius: "8px",
+  border: "1px solid #e2e8f0",
+  color: "#334155",
+  textDecoration: "none",
+  fontWeight: 600,
+  background: "#fff",
 };

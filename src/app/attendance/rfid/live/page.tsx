@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 type Scan = {
   id: number;
   name: string;
@@ -33,6 +35,12 @@ export default function LiveRFIDPage() {
 
   return (
     <div style={{ padding: "24px" }}>
+      <div style={{ marginBottom: "16px" }}>
+        <Link href="/attendance/rfid" style={backButtonStyle}>
+          ← Back to RFID Dashboard
+        </Link>
+      </div>
+
       <h1 style={{ fontSize: "28px", fontWeight: "bold" }}>
         Live RFID Attendance Monitor
       </h1>
@@ -81,4 +89,17 @@ const thStyle: React.CSSProperties = {
 const tdStyle: React.CSSProperties = {
   padding: "10px",
   border: "1px solid #ddd",
+};
+
+const backButtonStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "8px",
+  padding: "8px 12px",
+  borderRadius: "8px",
+  border: "1px solid #ddd",
+  color: "#334155",
+  textDecoration: "none",
+  fontWeight: 600,
+  background: "#fff",
 };

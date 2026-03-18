@@ -1,19 +1,42 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { attendanceService } from '@/services/attendanceService';
 import { Attendance } from '@/types/attendance';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { Loader2, Search, AlertTriangle, Filter } from 'lucide-react';
+import { Loader2, Search, AlertTriangle, Filter, Radio } from 'lucide-react';
 import { format } from 'date-fns';
+import Link from 'next/link';
+
+type StoredUser = {
+  id?: string | number;
+  name?: string;
+  full_name?: string;
+};
 
 export default function AttendancePage() {
   const [records, setRecords] = useState<Attendance[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDate, setFilterDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [currentUser] = useState<StoredUser | null>(() => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const raw = localStorage.getItem('user');
+    if (!raw) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
     const loadData = async () => {
@@ -26,8 +49,25 @@ export default function AttendancePage() {
     void loadData();
   }, [filterDate]);
 
-  const filtered = records.filter(r =>
-    r.employeeName.toLowerCase().includes(searchTerm.toLowerCase())
+  const accountRecords = useMemo(() => {
+    if (!currentUser) {
+      return [];
+    }
+
+    const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+    const accountId = currentUser.id ? String(currentUser.id) : '';
+    const accountName = normalize(currentUser.full_name || currentUser.name || '');
+
+    return records.filter((record) => {
+      const sameId = accountId !== '' && record.employeeId === accountId;
+      const recordName = normalize(record.employeeName);
+      const sameName = accountName !== '' && (recordName === accountName || recordName.includes(accountName) || accountName.includes(recordName));
+      return sameId || sameName;
+    });
+  }, [currentUser, records]);
+
+  const filtered = accountRecords.filter((record) =>
+    record.employeeName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -41,7 +81,11 @@ export default function AttendancePage() {
           <Button variant="outline" className="border-slate-200">
             <Filter className="mr-2 h-4 w-4 text-slate-500" /> Filter
           </Button>
-        
+          <Button asChild className="h-10 px-4 bg-red-600 hover:bg-red-700">
+            <Link href="/attendance/rfid" className="inline-flex items-center gap-2 font-medium">
+              <Radio className="h-4.5 w-4.5" /> Open RFID Page
+            </Link>
+          </Button>
         </div>
       </div>
 
