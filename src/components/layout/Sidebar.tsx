@@ -70,7 +70,7 @@ export function Sidebar({ user }: SidebarProps) {
   return (
     <div className="flex h-full w-64 flex-col bg-slate-900 text-white shadow-xl transition-all duration-300">
       <div className="flex h-16 items-center px-6 border-b border-slate-800">
-        <span className="text-lg font-bold tracking-tight">SDCA Personnel Management System</span>
+        <span className="text-lg font-bold tracking-tight">DomStaX</span>
       </div>
       
       <div className="flex-1 overflow-y-auto py-4">
@@ -100,7 +100,7 @@ export function Sidebar({ user }: SidebarProps) {
       <div className="border-t border-slate-800 p-4 space-y-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-slate-800 flex items-center justify-center text-red-400 font-bold border border-slate-700">
-            {user?.full_name.charAt(0) || 'U'}
+            {user?.name?.charAt(0) ?? 'U'}
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-medium">{user?.name}</span>

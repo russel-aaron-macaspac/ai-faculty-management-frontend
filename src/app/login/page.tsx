@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,12 +16,12 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { authService } from '@/services/authService';
 import { Loader2 } from 'lucide-react';
 
 const loginSchema = z.object({
-  email: z.string().email({ message: 'Invalid email address' }),
+  email: z.email({ message: 'Invalid email address' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
 });
 
@@ -28,6 +29,15 @@ export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    const splashTimer = globalThis.setTimeout(() => {
+      setShowSplash(false);
+    }, 2200);
+
+    return () => globalThis.clearTimeout(splashTimer);
+  }, []);
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -58,11 +68,40 @@ export default function LoginPage() {
         default:
           router.push('/');
       }
-    } catch (err: any) {
-      setError(err.message || 'Login failed');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Login failed';
+      setError(message);
     } finally {
       setIsLoading(false);
     }
+  }
+
+  if (showSplash) {
+    return (
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 text-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(239,68,68,0.16),transparent_42%),radial-gradient(circle_at_80%_30%,rgba(248,113,113,0.14),transparent_36%),radial-gradient(circle_at_50%_90%,rgba(251,146,60,0.12),transparent_46%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(15,23,42,0.12)_0%,rgba(15,23,42,0.45)_55%,rgba(2,6,23,0.75)_100%)]" />
+        <div className="splash-grid-overlay absolute inset-0" />
+
+        <div className="splash-fade-in relative z-10 flex w-full max-w-xl flex-col items-center gap-6 px-6 text-center">
+          <div className="splash-logo-glow" aria-hidden="true" />
+          <Image
+            src="/fulllogocolored.png"
+            alt="DomStaX"
+            width={260}
+            height={96}
+            priority
+            className="splash-logo-pulse splash-logo-clarity relative z-10 h-auto w-[220px] sm:w-[260px]"
+          />
+
+          <p className="text-sm tracking-[0.24em] text-red-100/90 uppercase">Streamlining Faculy and Staff, Digitally</p>
+
+          <div className="splash-progress-track w-56 overflow-hidden rounded-full bg-white/15">
+            <div className="splash-progress-bar h-1.5 w-full rounded-full" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -76,7 +115,7 @@ export default function LoginPage() {
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-3xl font-bold tracking-tight text-slate-900">Sign in</CardTitle>
           <CardDescription className="text-slate-500">
-            AI-Assisted Faculty & Staff Management System
+            Streamlining Faculty and Staff, Digitally
           </CardDescription>
         </CardHeader>
         <CardContent>
