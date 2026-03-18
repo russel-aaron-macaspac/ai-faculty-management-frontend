@@ -30,7 +30,6 @@ export default function FacultyDashboardPage() {
   }, []);
 
   const todayStats = useMemo(() => {
-    const normalizeName = (name: string) => name.trim().toLowerCase().replace(/\s+/g, ' ');
     const parseMinutes = (time: string) => {
       const [hour, minute] = time.split(':').map(Number);
       if (Number.isNaN(hour) || Number.isNaN(minute)) {
@@ -38,6 +37,7 @@ export default function FacultyDashboardPage() {
       }
       return hour * 60 + minute;
     };
+
     const formatHourMinute = (time: string) => {
       const minutes = parseMinutes(time);
       if (minutes === null) {
@@ -52,7 +52,7 @@ export default function FacultyDashboardPage() {
     };
 
     const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-    const accountName = normalizeName((user as User & { full_name?: string } | null)?.name ?? (user as User & { full_name?: string } | null)?.full_name ?? '');
+    const accountName = (user as User & { full_name?: string } | null)?.full_name ?? '';
     const now = new Date();
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
@@ -66,8 +66,7 @@ export default function FacultyDashboardPage() {
           return false;
         }
 
-        const scheduleName = normalizeName(schedule.employeeName);
-        return !!accountName && (scheduleName === accountName || scheduleName.includes(accountName) || accountName.includes(scheduleName));
+        return !!accountName && schedule.employeeName === accountName;
       })
       .sort((a, b) => (parseMinutes(a.startTime) ?? 0) - (parseMinutes(b.startTime) ?? 0));
 
@@ -117,7 +116,7 @@ export default function FacultyDashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Faculty Dashboard</h1>
-        <p className="text-slate-500 mt-1">Hello, {user?.name}. Here is your schedule and status for today.</p>
+        <p className="text-slate-500 mt-1">Hello, {(user as User & { full_name?: string } | null)?.full_name}. Here is your schedule and status for today.</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
