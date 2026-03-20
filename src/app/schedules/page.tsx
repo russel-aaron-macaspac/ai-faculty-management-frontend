@@ -97,7 +97,7 @@ export default function SchedulesPage() {
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">{user?.role === 'admin' ? 'Master Schedule' : 'My Schedule'}</h1>
-          <p className="text-slate-500 mt-1">Manage faculty classes and staff work shifts.</p>
+          <p className="text-slate-500 mt-1">See your scheduled classes and shifts.</p>
         </div>
         
         {user?.role === 'admin' && (
