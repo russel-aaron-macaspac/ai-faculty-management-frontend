@@ -1,13 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { clearanceService } from '@/services/clearanceService';
 import { Clearance } from '@/types/clearance';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { UploadCloud, CheckCircle2, AlertTriangle, FileText, Loader2, Search } from 'lucide-react';
+import { FACULTY_REQUIRED_OFFICES, toOfficeSlug } from '@/lib/clearanceOffices';
+
+type StoredUser = {
+  id?: string | number;
+  role?: 'admin' | 'faculty' | 'staff';
+  name?: string;
+  full_name?: string;
+};
 
 export default function ClearancePage() {
   const [records, setRecords] = useState<Clearance[]>([]);
@@ -15,10 +24,9 @@ export default function ClearancePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<StoredUser | null>(null);
+  const isFacultyUser = currentUser?.role === 'faculty';
 
-  // Mock form state
-  const [empId] = useState('f1');
-  const [empName] = useState('Dr. Alice Brown');
   const [docName, setDocName] = useState('Safety Training Certificate');
 
   const loadData = async () => {
@@ -29,50 +37,164 @@ export default function ClearancePage() {
   };
 
   useEffect(() => {
+    const raw = localStorage.getItem('user');
+    if (!raw) {
+      return;
+    }
+
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCurrentUser(JSON.parse(raw) as StoredUser);
+    } catch {
+      // Ignore invalid local storage user payload.
+    }
+  }, []);
+
+  useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, []);
 
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleUpload = async (event: { preventDefault: () => void }) => {
+    event.preventDefault();
+    const employeeId = currentUser?.id ? String(currentUser.id) : '';
+    const employeeName = currentUser?.full_name || currentUser?.name || 'Unknown User';
+
+    if (!employeeId) {
+      return;
+    }
+
     setUploading(true);
-    await clearanceService.uploadDocument(empId, empName, docName);
+    await clearanceService.uploadDocument(employeeId, employeeName, docName);
     setUploading(false);
     setIsUploadOpen(false);
     loadData();
   };
 
-  const filtered = records.filter(r => 
-    r.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.requiredDocument.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    const normalize = (value: string) => value.trim().toLowerCase().split(/\s+/).join(' ');
+
+    if (currentUser?.role === 'faculty') {
+      const accountId = currentUser.id ? String(currentUser.id) : '';
+      const accountName = normalize(currentUser.full_name || currentUser.name || '');
+      const ownRecords = records.filter((record) => {
+        const sameId = accountId !== '' && record.employeeId === accountId;
+        const recordName = normalize(record.employeeName);
+        const sameName =
+          accountName !== '' &&
+          (recordName === accountName || recordName.includes(accountName) || accountName.includes(recordName));
+        return sameId || sameName;
+      });
+
+      return FACULTY_REQUIRED_OFFICES.map((office, index) => {
+        const existing = ownRecords.find((row) => normalize(row.requiredDocument) === normalize(office));
+        if (existing) {
+          return existing;
+        }
+
+        return {
+          id: `required-${index}`,
+          employeeId: accountId || 'N/A',
+          employeeName: currentUser.full_name || currentUser.name || 'Faculty User',
+          requiredDocument: office,
+          status: 'pending' as const,
+        };
+      }).filter((row) =>
+        row.requiredDocument.toLowerCase().includes(term) ||
+        row.employeeName.toLowerCase().includes(term)
+      );
+    }
+
+    return records.filter((record) =>
+      record.employeeName.toLowerCase().includes(term) ||
+      record.requiredDocument.toLowerCase().includes(term)
+    );
+  }, [records, searchTerm, currentUser]);
+
+  const pageTitle = isFacultyUser ? 'My Clearance Offices' : 'Clearance & Compliance';
+  const pageSubtitle = isFacultyUser
+    ? 'Track required office and department signatures for your clearance.'
+    : 'Track and validate required employee documents.';
+
+  const getStatusClass = (status: Clearance['status']) => {
+    if (status === 'approved') return 'bg-emerald-100 text-emerald-800';
+    if (status === 'submitted') return 'bg-red-100 text-red-800';
+    if (status === 'rejected') return 'bg-rose-100 text-rose-800';
+    return 'bg-slate-100 text-slate-800';
+  };
+
+  let tableRows: React.ReactNode;
+  if (loading) {
+    tableRows = (
+      <TableRow>
+        <TableCell colSpan={3} className="text-center py-10 text-slate-500">
+          <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-red-500" />
+          Loading clearance data...
+        </TableCell>
+      </TableRow>
+    );
+  } else if (filtered.length === 0) {
+    tableRows = (
+      <TableRow>
+        <TableCell colSpan={3} className="text-center py-10 text-slate-500">
+          No documents found.
+        </TableCell>
+      </TableRow>
+    );
+  } else {
+    tableRows = filtered.map((record) => (
+      <TableRow key={record.id}>
+        <TableCell>
+          <div className="text-sm font-medium flex items-center gap-2">
+            <FileText className="h-4 w-4 text-slate-400" />
+            <Link href={`/clearance/${toOfficeSlug(record.requiredDocument)}`} className="text-slate-800 hover:text-red-700 hover:underline">
+              {record.requiredDocument}
+            </Link>
+          </div>
+          {record.validationWarning && (
+            <div className="text-xs text-rose-600 mt-1 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" /> AI Flag: {record.validationWarning}
+            </div>
+          )}
+        </TableCell>
+        <TableCell className="text-sm text-slate-600">{record.submissionDate || 'Not submitted'}</TableCell>
+        <TableCell>
+          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${getStatusClass(record.status)}`}>
+            {record.status === 'approved' && <CheckCircle2 className="h-3 w-3" />}
+            {record.status}
+          </span>
+        </TableCell>
+      </TableRow>
+    ));
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Clearance & Compliance</h1>
-          <p className="text-slate-500 mt-1">Track and validate required employee documents.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">{pageTitle}</h1>
+          <p className="text-slate-500 mt-1">{pageSubtitle}</p>
         </div>
-        
+
+        {!isFacultyUser && (
         <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-          <DialogTrigger asChild>
-             <Button className="bg-red-600 hover:bg-red-700">
-               <UploadCloud className="mr-2 h-4 w-4" /> Upload Document
-             </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <Button className="bg-red-600 hover:bg-red-700" onClick={() => setIsUploadOpen(true)}>
+            <UploadCloud className="mr-2 h-4 w-4" /> Upload Document
+          </Button>
+           <DialogContent className="sm:max-w-lg">
              <DialogHeader>
                 <DialogTitle>Submit Clearance Document</DialogTitle>
              </DialogHeader>
              <form onSubmit={handleUpload} className="space-y-4 pt-4">
                <div className="space-y-2">
-                 <label className="text-sm font-medium">Document Name</label>
-                 <Input value={docName} onChange={e => setDocName(e.target.value)} required />
+                <label htmlFor="clearance-doc-name" className="text-sm font-medium">Document Name</label>
+                <Input id="clearance-doc-name" value={docName} onChange={e => setDocName(e.target.value)} required />
                </div>
                <div className="space-y-2">
-                 <label className="text-sm font-medium">File Upload</label>
+                <label htmlFor="clearance-file-upload" className="text-sm font-medium">File Upload</label>
                  <div className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center hover:bg-slate-50 transition-colors cursor-pointer">
+                  <input id="clearance-file-upload" type="file" className="sr-only" />
                     <FileText className="h-8 w-8 text-slate-400 mx-auto mb-2" />
                     <span className="text-sm text-red-600 font-medium">Click to upload</span>
                     <span className="text-sm text-slate-500"> or drag and drop</span>
@@ -88,13 +210,14 @@ export default function ClearancePage() {
              </form>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center gap-2">
            <Search className="h-5 w-5 text-slate-400" />
            <Input 
-             placeholder="Search by employee or document..." 
+             placeholder="Search by office or requirement..." 
              className="hidden md:block max-w-sm border-0 focus-visible:ring-0 px-0"
              value={searchTerm}
              onChange={(e) => setSearchTerm(e.target.value)}
@@ -104,59 +227,13 @@ export default function ClearancePage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-slate-50">
-              <TableHead>Employee</TableHead>
-              <TableHead>Requirement</TableHead>
+              <TableHead>Office / Requirement</TableHead>
               <TableHead>Submission Date</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-10 text-slate-500">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-red-500" />
-                  Loading clearance data...
-                </TableCell>
-              </TableRow>
-            ) : filtered.length === 0 ? (
-              <TableRow>
-                 <TableCell colSpan={4} className="text-center py-10 text-slate-500">
-                   No documents found.
-                 </TableCell>
-              </TableRow>
-            ) : filtered.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell>
-                  <div className="font-medium text-slate-900">{r.employeeName}</div>
-                  <div className="text-xs text-slate-500">ID: {r.employeeId}</div>
-                </TableCell>
-                <TableCell>
-                  <div className="text-sm font-medium flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-slate-400" />
-                    {r.requiredDocument}
-                  </div>
-                  {r.validationWarning && (
-                     <div className="text-xs text-rose-600 mt-1 flex items-center gap-1">
-                       <AlertTriangle className="h-3 w-3" /> AI Flag: {r.validationWarning}
-                     </div>
-                  )}
-                </TableCell>
-                <TableCell className="text-sm text-slate-600">
-                  {r.submissionDate || 'Not submitted'}
-                </TableCell>
-                <TableCell>
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
-                    r.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 
-                    r.status === 'submitted' ? 'bg-red-100 text-red-800' : 
-                    r.status === 'rejected' ? 'bg-rose-100 text-rose-800' :
-                    'bg-slate-100 text-slate-800'
-                  }`}>
-                    {r.status === 'approved' && <CheckCircle2 className="h-3 w-3" />}
-                    {r.status}
-                  </span>
-                </TableCell>
-              </TableRow>
-            ))}
+            {tableRows}
           </TableBody>
         </Table>
       </div>
