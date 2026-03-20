@@ -86,7 +86,7 @@ export default function LoginPage() {
         <div className="splash-fade-in relative z-10 flex w-full max-w-xl flex-col items-center gap-6 px-6 text-center">
           <div className="splash-logo-glow" aria-hidden="true" />
           <Image
-            src="/fulllogocolored.png"
+            src="/croppedcolored.png"
             alt="DomStaX"
             width={260}
             height={96}

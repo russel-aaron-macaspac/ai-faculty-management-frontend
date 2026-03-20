@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import Image from 'next/image';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { 
   LayoutDashboard, 
@@ -14,15 +15,13 @@ import {
   LogOut,
 } from 'lucide-react';
 import { User } from '@/types/user';
-
-import { useRouter } from 'next/navigation';
 import { authService } from '@/services/authService';
 
 interface SidebarProps {
   user: User | null;
 }
 
-export function Sidebar({ user }: SidebarProps) {
+export function Sidebar({ user }: Readonly<SidebarProps>) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -59,16 +58,23 @@ export function Sidebar({ user }: SidebarProps) {
   if (user?.role === 'faculty') links = facultyLinks;
   if (user?.role === 'staff') links = staffLinks;
 
-  const handleLogout = async () => {
-    await authService.logout();
+  const handleLogout = () => {
+    authService.logout();
     localStorage.removeItem('user');
     router.push('/login');
   };
 
   return (
     <div className="flex h-full w-64 flex-col bg-slate-900 text-white shadow-xl transition-all duration-300">
-      <div className="flex h-16 items-center px-6 border-b border-slate-800">
-        <span className="text-lg font-bold tracking-tight">DomStaX</span>
+      <div className="flex h-16 items-center justify-start px-4 border-b border-slate-800">
+        <Image
+          src="/cropped.png"
+          alt="DomStaX"
+          width={168}
+          height={40}
+          className="h-8 w-auto"
+          priority
+        />
       </div>
       
       <div className="flex-1 overflow-y-auto py-4">
