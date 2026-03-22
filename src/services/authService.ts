@@ -1,4 +1,6 @@
-export type UserRole = "admin" | "faculty" | "staff";
+import { Role } from '@/types/user';
+
+export type UserRole = Role;
 export type UserStatus = "active" | "inactive" | "on_leave" | "resigned";
 
 export interface AuthUser {

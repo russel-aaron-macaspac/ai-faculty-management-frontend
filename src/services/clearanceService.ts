@@ -25,5 +25,40 @@ export const clearanceService = {
     };
     mockClearanceData.push(newClearance);
     return newClearance;
+  },
+
+  updateClearanceStatus: async (clearanceId: string, newStatus: 'pending' | 'submitted' | 'approved' | 'rejected'): Promise<Clearance | null> => {
+    await delay(600);
+    const target = mockClearanceData.find((row) => row.id === clearanceId);
+    if (!target) {
+      return null;
+    }
+
+    target.status = newStatus;
+    target.submissionDate = target.submissionDate || new Date().toISOString().split('T')[0];
+    return { ...target };
+  },
+
+  approveClearance: async (clearanceId: string): Promise<Clearance | null> => {
+    return clearanceService.updateClearanceStatus(clearanceId, 'approved');
+  },
+
+  rejectClearance: async (clearanceId: string): Promise<Clearance | null> => {
+    return clearanceService.updateClearanceStatus(clearanceId, 'rejected');
+  },
+
+  setPendingClearance: async (clearanceId: string): Promise<Clearance | null> => {
+    return clearanceService.updateClearanceStatus(clearanceId, 'pending');
+  },
+
+  addReviewNotes: async (clearanceId: string, notes: string): Promise<Clearance | null> => {
+    await delay(400);
+    const target = mockClearanceData.find((row) => row.id === clearanceId);
+    if (!target) {
+      return null;
+    }
+
+    target.dlrcReviewNotes = notes;
+    return { ...target };
   }
 };

@@ -16,10 +16,19 @@ import {
 } from 'lucide-react';
 import { User } from '@/types/user';
 import { authService } from '@/services/authService';
+import { isApprovalOfficer, getApprovalOfficerConfig } from '@/lib/roleConfig';
 
 interface SidebarProps {
   user: User | null;
 }
+
+const createMenuLinks = (label: string) => [
+  { href: '/dashboard/staff', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard/profile', label: 'My Profile', icon: UserSquare2 },
+  { href: '/schedules', label: 'Work Schedule', icon: Calendar },
+  { href: '/attendance', label: 'Attendance', icon: Clock },
+  { href: '/clearance', label, icon: FileCheck2 },
+];
 
 export function Sidebar({ user }: Readonly<SidebarProps>) {
   const pathname = usePathname();
@@ -55,8 +64,17 @@ export function Sidebar({ user }: Readonly<SidebarProps>) {
   ];
 
   let links = adminLinks;
-  if (user?.role === 'faculty') links = facultyLinks;
-  if (user?.role === 'staff') links = staffLinks;
+  if (user?.role === 'faculty') {
+    links = facultyLinks;
+  } else if (user?.role === 'staff') {
+    links = staffLinks;
+  } else if (isApprovalOfficer(user?.role)) {
+    // Dynamically create links for approval officers
+    const officerConfig = getApprovalOfficerConfig(user?.role as string);
+    if (officerConfig) {
+      links = createMenuLinks(officerConfig.label);
+    }
+  }
 
   const handleLogout = () => {
     authService.logout();

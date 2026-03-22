@@ -2,30 +2,37 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { clearanceService } from '@/services/clearanceService';
 import { Clearance } from '@/types/clearance';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { UploadCloud, CheckCircle2, AlertTriangle, FileText, Loader2, Search } from 'lucide-react';
+import { UploadCloud, CheckCircle2, AlertTriangle, FileText, Loader2, Search, Check, X, Clock } from 'lucide-react';
 import { FACULTY_REQUIRED_OFFICES, toOfficeSlug } from '@/lib/clearanceOffices';
+import { isApprovalOfficer, getClearancePageInfo } from '@/lib/roleConfig';
 
 type StoredUser = {
   id?: string | number;
-  role?: 'admin' | 'faculty' | 'staff';
+  role?: string;
   name?: string;
   full_name?: string;
 };
 
 export default function ClearancePage() {
+  const router = useRouter();
   const [records, setRecords] = useState<Clearance[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<StoredUser | null>(null);
+  
   const isFacultyUser = currentUser?.role === 'faculty';
+  const isApprovalOfficer_ = isApprovalOfficer(currentUser?.role);
+  const showActionColumn = isApprovalOfficer_;
 
   const [docName, setDocName] = useState('Safety Training Certificate');
 
@@ -74,6 +81,10 @@ export default function ClearancePage() {
   const filtered = useMemo(() => {
     const term = searchTerm.toLowerCase();
     const normalize = (value: string) => value.trim().toLowerCase().split(/\s+/).join(' ');
+    const isFacultyRequest = (record: Clearance) => {
+      const normalizedName = normalize(record.employeeName);
+      return record.employeeId.toLowerCase().startsWith('f') || normalizedName.startsWith('dr. ');
+    };
 
     if (currentUser?.role === 'faculty') {
       const accountId = currentUser.id ? String(currentUser.id) : '';
@@ -106,16 +117,49 @@ export default function ClearancePage() {
       );
     }
 
+    if (isApprovalOfficer(currentUser?.role)) {
+      const facultyRecords = records.filter((record) => isFacultyRequest(record));
+      
+      const facultyMap = new Map<string, Clearance[]>();
+      facultyRecords.forEach((record) => {
+        const id = record.employeeId;
+        if (!facultyMap.has(id)) {
+          facultyMap.set(id, []);
+        }
+        facultyMap.get(id)!.push(record);
+      });
+
+      const uniqueFaculty = Array.from(facultyMap.values()).map((records) => {
+        const latestStatus = records[0];
+        const hasPendingOrSubmitted = records.some((r) => r.status === 'pending' || r.status === 'submitted');
+        
+        return {
+          ...latestStatus,
+          requiredDocument: `Clearance Request (${records.length} documents)`,
+          _allRecords: records,
+          _hasPending: hasPendingOrSubmitted,
+        };
+      });
+
+      return uniqueFaculty.filter((faculty) =>
+        faculty.employeeName.toLowerCase().includes(term)
+      );
+    }
+
     return records.filter((record) =>
       record.employeeName.toLowerCase().includes(term) ||
       record.requiredDocument.toLowerCase().includes(term)
     );
   }, [records, searchTerm, currentUser]);
 
-  const pageTitle = isFacultyUser ? 'Clearance Offices' : 'Clearance & Compliance';
-  const pageSubtitle = isFacultyUser
-    ? 'Track required office and department signatures for your clearance.'
-    : 'Track and validate required employee documents.';
+  const handleDecision = async (record: Clearance, decision: 'approved' | 'rejected' | 'pending') => {
+    setActionLoadingId(record.id);
+    await clearanceService.updateClearanceStatus(record.id, decision);
+    await loadData();
+    setActionLoadingId(null);
+  };
+
+  const { title: pageTitle, subtitle: pageSubtitle } = getClearancePageInfo(currentUser?.role);
 
   const getStatusClass = (status: Clearance['status']) => {
     if (status === 'approved') return 'bg-emerald-100 text-emerald-800';
@@ -128,7 +172,7 @@ export default function ClearancePage() {
   if (loading) {
     tableRows = (
       <TableRow>
-        <TableCell colSpan={3} className="text-center py-10 text-slate-500">
+        <TableCell colSpan={showActionColumn ? 4 : 3} className="text-center py-10 text-slate-500">
           <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-red-500" />
           Loading clearance data...
         </TableCell>
@@ -137,20 +181,32 @@ export default function ClearancePage() {
   } else if (filtered.length === 0) {
     tableRows = (
       <TableRow>
-        <TableCell colSpan={3} className="text-center py-10 text-slate-500">
+        <TableCell colSpan={showActionColumn ? 4 : 3} className="text-center py-10 text-slate-500">
           No documents found.
         </TableCell>
       </TableRow>
     );
   } else {
-    tableRows = filtered.map((record) => (
-      <TableRow key={record.id}>
+    tableRows = filtered.map((record: any) => (
+      <TableRow 
+        key={record.id}
+        className={isApprovalOfficer_ ? 'cursor-pointer hover:bg-slate-50' : ''}
+        onClick={() => {
+          if (isApprovalOfficer_) {
+            router.push(`/clearance/faculty/${record.employeeId}`);
+          }
+        }}
+      >
         <TableCell>
           <div className="text-sm font-medium flex items-center gap-2">
             <FileText className="h-4 w-4 text-slate-400" />
-            <Link href={`/clearance/${toOfficeSlug(record.requiredDocument)}`} className="text-slate-800 hover:text-red-700 hover:underline">
-              {record.requiredDocument}
-            </Link>
+            {isApprovalOfficer_ ? (
+              <span className="text-slate-800 font-semibold">{record.employeeName}</span>
+            ) : (
+              <Link href={`/clearance/${toOfficeSlug(record.requiredDocument)}`} className="text-slate-800 hover:text-red-700 hover:underline">
+                {record.requiredDocument}
+              </Link>
+            )}
           </div>
           {record.validationWarning && (
             <div className="text-xs text-rose-600 mt-1 flex items-center gap-1">
@@ -165,6 +221,42 @@ export default function ClearancePage() {
             {record.status}
           </span>
         </TableCell>
+        {showActionColumn && (
+          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+            <div className="inline-flex flex-col gap-1 sm:gap-2 sm:flex-row">
+              <Button
+                type="button"
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700"
+                disabled={actionLoadingId === record.id || record.status === 'approved'}
+                onClick={() => void handleDecision(record, 'approved')}
+              >
+                {actionLoadingId === record.id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1 h-3.5 w-3.5" />}
+                Approve
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="destructive"
+                disabled={actionLoadingId === record.id || record.status === 'rejected'}
+                onClick={() => void handleDecision(record, 'rejected')}
+              >
+                <X className="mr-1 h-3.5 w-3.5" />
+                Reject
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={actionLoadingId === record.id || record.status === 'pending'}
+                onClick={() => void handleDecision(record, 'pending')}
+              >
+                <Clock className="mr-1 h-3.5 w-3.5" />
+                Pending
+              </Button>
+            </div>
+          </TableCell>
+        )}
       </TableRow>
     ));
   }
@@ -177,7 +269,7 @@ export default function ClearancePage() {
           <p className="text-slate-500 mt-1">{pageSubtitle}</p>
         </div>
 
-        {!isFacultyUser && (
+        {!isFacultyUser && !isApprovalOfficer_ && (
         <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
           <Button className="bg-red-600 hover:bg-red-700" onClick={() => setIsUploadOpen(true)}>
             <UploadCloud className="mr-2 h-4 w-4" /> Upload Document
@@ -220,6 +312,7 @@ export default function ClearancePage() {
               <TableHead>Office / Requirement</TableHead>
               <TableHead>Submission Date</TableHead>
               <TableHead>Status</TableHead>
+              {showActionColumn && <TableHead className="text-right">Decision</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>

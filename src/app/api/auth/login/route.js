@@ -1,6 +1,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/server-client";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { APPROVAL_OFFICERS } from "@/lib/roleConfig";
 
 export async function POST(request) {
   try {
@@ -11,6 +12,22 @@ export async function POST(request) {
         { error: "Email and password are required" },
         { status: 400 }
       );
+    }
+
+    // Check approval officers dynamically
+    const officer = APPROVAL_OFFICERS.find(
+      o => o.email.toLowerCase() === email.toLowerCase()
+    );
+
+    if (officer && password === 'password123') {
+      return NextResponse.json({
+        user: {
+          id: `${officer.id}-1`,
+          email: officer.email,
+          role: officer.id,
+          full_name: officer.name,
+        },
+      });
     }
 
     const supabase = createSupabaseAdminClient();

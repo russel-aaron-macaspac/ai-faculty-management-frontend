@@ -14,7 +14,7 @@ import { fromOfficeSlug } from '@/lib/clearanceOffices';
 
 type StoredUser = {
   id?: string | number;
-  role?: 'admin' | 'faculty' | 'staff';
+  role?: string;
   name?: string;
   full_name?: string;
 };
@@ -77,12 +77,17 @@ const DOCUMENT_TYPE_RULES: Record<string, string[]> = {
   'ICT Device Return Slip': ['device return', 'ict office', 'asset tag'],
   'Library Clearance Form': ['library', 'borrowed books', 'return slip'],
   'Laboratory Tools Return Checklist': ['laboratory', 'tools', 'checklist'],
+  'CESO Completion Certificate': ['ceso', 'completion certificate', 'completed'],
+  'Financial Clearance': ['financial clearance', 'cashier', 'no outstanding balance'],
+  'PMO Equipment Return': ['pmo', 'equipment return', 'property management office'],
+  'Program Chair Clearance': ['program chair', 'clearance', 'department'],
+  'Borrowed Book Slip': ['borrowed book slip', 'borrowed books slip', 'borrowed book', 'library', 'book return', 'dlrc'],
 };
 
 const DOCUMENT_TYPES = Object.keys(DOCUMENT_TYPE_RULES);
 
 function validateDocument(selectedType: string, extractedText: string): DocumentValidationResult {
-  const normalizedText = extractedText.toLowerCase();
+  const normalizedText = normalize(extractedText);
   const expectedKeywords = DOCUMENT_TYPE_RULES[selectedType] || [];
 
   if (expectedKeywords.length === 0) {
@@ -93,7 +98,7 @@ function validateDocument(selectedType: string, extractedText: string): Document
     };
   }
 
-  const matchedKeywords = expectedKeywords.filter((keyword) => normalizedText.includes(keyword));
+  const matchedKeywords = expectedKeywords.filter((keyword) => normalizedText.includes(normalize(keyword)));
   const confidence = Math.round((matchedKeywords.length / expectedKeywords.length) * 100);
   const requiredMatches = Math.ceil(expectedKeywords.length * 0.6);
 
@@ -374,9 +379,7 @@ export default function OfficeClearanceDetailPage() {
                       Matched Document Type: {validationResult.isMatch ? '✅' : '❌'}
                     </p>
                     <p className="text-slate-700">Confidence Score: {validationResult.confidence}%</p>
-                    <p className="text-slate-700">
-                      Detected Keywords: {validationResult.matchedKeywords.length > 0 ? validationResult.matchedKeywords.join(', ') : 'None'}
-                    </p>
+              
                     {!validationResult.isMatch && (
                       <p className="mt-2 flex items-center gap-1 text-amber-600">
                         <AlertTriangle className="h-4 w-4" />

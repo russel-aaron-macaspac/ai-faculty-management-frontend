@@ -1,4 +1,6 @@
-export type Role = 'admin' | 'faculty' | 'staff';
+import type { ApprovalOfficerId } from '@/lib/roleConfig';
+
+export type Role = 'admin' | 'faculty' | 'staff' | ApprovalOfficerId;
 
 export interface User {
   id: string;

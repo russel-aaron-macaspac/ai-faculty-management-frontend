@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { User } from '@/types/user';
+import { isApprovalOfficer } from '@/lib/roleConfig';
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -27,20 +28,21 @@ export default function ProfilePage() {
     );
   }
 
+  let department = 'Operations';
+  let position = 'System Administrator';
+
+  if (user.role === 'faculty') {
+    department = 'Computer Science';
+    position = 'Associate Professor';
+  } else if (user.role === 'staff' || isApprovalOfficer(user.role)) {
+    department = 'Administration';
+    position = 'Office Manager';
+  }
+
   const profileDetails = {
     employeeId: user.id,
-    department:
-      user.role === 'faculty'
-        ? 'Computer Science'
-        : user.role === 'staff'
-        ? 'Administration'
-        : 'Operations',
-    position:
-      user.role === 'faculty'
-        ? 'Associate Professor'
-        : user.role === 'staff'
-        ? 'Office Manager'
-        : 'System Administrator',
+    department,
+    position,
     phone: '+63 917 123 4567',
     address: '123 Main St, Springfield, ST 12345',
     hireDate: 'Aug 15, 2022',
@@ -68,7 +70,7 @@ export default function ProfilePage() {
         <CardContent className="grid gap-6 sm:grid-cols-2">
           <div className="space-y-1">
             <div className="text-xs text-slate-500 uppercase tracking-wide">Email</div>
-            <div className="text-sm text-slate-900 break-words">{user.email}</div>
+            <div className="text-sm text-slate-900 wrap-break-word">{user.email}</div>
           </div>
 
           <div className="space-y-1">

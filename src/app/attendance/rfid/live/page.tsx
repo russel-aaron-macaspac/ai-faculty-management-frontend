@@ -17,7 +17,7 @@ import { Loader2, Radio, Sparkles, ShieldCheck, CalendarDays, Clock3 } from 'luc
 
 export default function LiveRFIDPage() {
   const { user, isLoading } = useRoleBasedAccess({
-    allowedRoles: ['faculty', 'staff'],
+    allowedRoles: ['faculty', 'staff', 'dlrc', 'pmo', 'laboratory', 'ict', 'ceso', 'programchair', 'dean', 'registrar', 'ovprel', 'ovpaa', 'account', 'treasury', 'hro'],
     redirectTo: '/dashboard/admin',
   });
 
