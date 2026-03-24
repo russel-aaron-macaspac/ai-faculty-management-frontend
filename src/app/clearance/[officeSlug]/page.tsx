@@ -178,21 +178,32 @@ export default function OfficeClearanceDetailPage() {
     saveLocalState(officeState);
   };
 
-  const handleSubmitDocument = () => {
-    if (!selectedDocumentFile) {
-      return;
+  const handleSubmitDocument = async () => {
+    if (!selectedDocumentFile) return;
+
+    const employeeId = currentUser?.id ? String(currentUser.id) : '';
+    if (!employeeId) return;
+
+    try {
+      await clearanceService.uploadDocument(
+        employeeId,
+        currentUser?.full_name || currentUser?.name || '',
+        officeName
+      );
+
+      const nextDocuments = [
+        { name: selectedDocumentFile.name, submittedAt: new Date().toLocaleString() },
+        ...officeState.documents,
+      ];
+
+      setSelectedDocumentFile(null);
+      saveLocalState({ ...officeState, documents: nextDocuments });
+
+      const data = await clearanceService.getClearances();
+      setRecords(data);
+    } catch (err) {
+      console.error('Failed to submit document:', err);
     }
-
-    const nextDocuments = [
-      {
-        name: selectedDocumentFile.name,
-        submittedAt: new Date().toLocaleString(),
-      },
-      ...officeState.documents,
-    ];
-
-    setSelectedDocumentFile(null);
-    saveLocalState({ ...officeState, documents: nextDocuments });
   };
 
   const handleRemoveDocument = (indexToRemove: number) => {
@@ -312,7 +323,7 @@ export default function OfficeClearanceDetailPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <Input type="file" onChange={(event) => setSelectedDocumentFile(event.target.files?.[0] || null)} />
-              <Button onClick={handleSubmitDocument} className="bg-red-600 hover:bg-red-700">
+              <Button onClick={() => void handleSubmitDocument()} className="bg-red-600 hover:bg-red-700">
                 <UploadCloud className="mr-2 h-4 w-4" /> Submit Document
               </Button>
 
@@ -379,7 +390,7 @@ export default function OfficeClearanceDetailPage() {
                       Matched Document Type: {validationResult.isMatch ? '✅' : '❌'}
                     </p>
                     <p className="text-slate-700">Confidence Score: {validationResult.confidence}%</p>
-              
+
                     {!validationResult.isMatch && (
                       <p className="mt-2 flex items-center gap-1 text-amber-600">
                         <AlertTriangle className="h-4 w-4" />

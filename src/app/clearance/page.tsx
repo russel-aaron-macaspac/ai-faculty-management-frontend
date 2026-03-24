@@ -29,7 +29,7 @@ export default function ClearancePage() {
   const [uploading, setUploading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<StoredUser | null>(null);
-  
+
   const isFacultyUser = currentUser?.role === 'faculty';
   const isApprovalOfficer_ = isApprovalOfficer(currentUser?.role);
   const showActionColumn = isApprovalOfficer_;
@@ -81,10 +81,6 @@ export default function ClearancePage() {
   const filtered = useMemo(() => {
     const term = searchTerm.toLowerCase();
     const normalize = (value: string) => value.trim().toLowerCase().split(/\s+/).join(' ');
-    const isFacultyRequest = (record: Clearance) => {
-      const normalizedName = normalize(record.employeeName);
-      return record.employeeId.toLowerCase().startsWith('f') || normalizedName.startsWith('dr. ');
-    };
 
     if (currentUser?.role === 'faculty') {
       const accountId = currentUser.id ? String(currentUser.id) : '';
@@ -118,10 +114,9 @@ export default function ClearancePage() {
     }
 
     if (isApprovalOfficer(currentUser?.role)) {
-      const facultyRecords = records.filter((record) => isFacultyRequest(record));
-      
       const facultyMap = new Map<string, Clearance[]>();
-      facultyRecords.forEach((record) => {
+
+      records.forEach((record) => {
         const id = record.employeeId;
         if (!facultyMap.has(id)) {
           facultyMap.set(id, []);
@@ -129,14 +124,14 @@ export default function ClearancePage() {
         facultyMap.get(id)!.push(record);
       });
 
-      const uniqueFaculty = Array.from(facultyMap.values()).map((records) => {
-        const latestStatus = records[0];
-        const hasPendingOrSubmitted = records.some((r) => r.status === 'pending' || r.status === 'submitted');
-        
+      const uniqueFaculty = Array.from(facultyMap.values()).map((recs) => {
+        const latestStatus = recs[0];
+        const hasPendingOrSubmitted = recs.some((r) => r.status === 'pending' || r.status === 'submitted');
+
         return {
           ...latestStatus,
-          requiredDocument: `Clearance Request (${records.length} documents)`,
-          _allRecords: records,
+          requiredDocument: `Clearance Request (${recs.length} documents)`,
+          _allRecords: recs,
           _hasPending: hasPendingOrSubmitted,
         };
       });
@@ -153,11 +148,19 @@ export default function ClearancePage() {
   }, [records, searchTerm, currentUser]);
 
   const handleDecision = async (record: Clearance, decision: 'approved' | 'rejected' | 'pending') => {
-    setActionLoadingId(record.id);
-    await clearanceService.updateClearanceStatus(record.id, decision);
-    await loadData();
-    setActionLoadingId(null);
-  };
+  let rejectionReason: string | undefined;
+
+  if (decision === 'rejected') {
+    const reason = globalThis.prompt('Enter rejection reason:');
+    if (!reason) return;
+    rejectionReason = reason;
+  }
+
+  setActionLoadingId(record.id);
+  await clearanceService.updateStatus(record.id, decision, rejectionReason);
+  await loadData();
+  setActionLoadingId(null);
+};
 
   const { title: pageTitle, subtitle: pageSubtitle } = getClearancePageInfo(currentUser?.role);
 
@@ -188,7 +191,7 @@ export default function ClearancePage() {
     );
   } else {
     tableRows = filtered.map((record: any) => (
-      <TableRow 
+      <TableRow
         key={record.id}
         className={isApprovalOfficer_ ? 'cursor-pointer hover:bg-slate-50' : ''}
         onClick={() => {
@@ -270,42 +273,42 @@ export default function ClearancePage() {
         </div>
 
         {!isFacultyUser && !isApprovalOfficer_ && (
-        <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-          <Button className="bg-red-600 hover:bg-red-700" onClick={() => setIsUploadOpen(true)}>
-            <UploadCloud className="mr-2 h-4 w-4" /> Upload Document
-          </Button>
-           <DialogContent className="sm:max-w-lg">
-             <DialogHeader>
+          <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+            <Button className="bg-red-600 hover:bg-red-700" onClick={() => setIsUploadOpen(true)}>
+              <UploadCloud className="mr-2 h-4 w-4" /> Upload Document
+            </Button>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
                 <DialogTitle>Submit Clearance Document</DialogTitle>
-             </DialogHeader>
-             <form onSubmit={handleUpload} className="space-y-4 pt-4">
-               <div className="space-y-2">
-                <label htmlFor="clearance-doc-name" className="text-sm font-medium">Document Name</label>
-                <Input id="clearance-doc-name" value={docName} onChange={e => setDocName(e.target.value)} required />
-               </div>
-               <div className="flex justify-end pt-4">
+              </DialogHeader>
+              <form onSubmit={handleUpload} className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <label htmlFor="clearance-doc-name" className="text-sm font-medium">Document Name</label>
+                  <Input id="clearance-doc-name" value={docName} onChange={e => setDocName(e.target.value)} required />
+                </div>
+                <div className="flex justify-end pt-4">
                   <Button type="submit" disabled={uploading}>
                     {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Submit for Review
                   </Button>
-               </div>
-             </form>
-          </DialogContent>
-        </Dialog>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center gap-2">
-           <Search className="h-5 w-5 text-slate-400" />
-           <Input 
-             placeholder="Search by office or requirement..." 
-             className="hidden md:block max-w-sm border-0 focus-visible:ring-0 px-0"
-             value={searchTerm}
-             onChange={(e) => setSearchTerm(e.target.value)}
-           />
+          <Search className="h-5 w-5 text-slate-400" />
+          <Input
+            placeholder="Search by office or requirement..."
+            className="hidden md:block max-w-sm border-0 focus-visible:ring-0 px-0"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-        
+
         <Table>
           <TableHeader>
             <TableRow className="bg-slate-50">
