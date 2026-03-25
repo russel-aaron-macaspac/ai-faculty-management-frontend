@@ -103,10 +103,10 @@ export default function FacultyPage() {
              form.reset({ fullName: '', email: '', department: '', phone: '', status: 'active' });
           }
         }}>
-          <DialogTrigger asChild>
-            <Button className="bg-red-600 hover:bg-red-700">
+           <DialogTrigger>
+            <button className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md font-medium flex items-center gap-2">
                <Plus className="mr-2 h-4 w-4" /> Add Faculty
-            </Button>
+            </button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>

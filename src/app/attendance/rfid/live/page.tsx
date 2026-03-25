@@ -81,7 +81,7 @@ export default function LiveRFIDPage() {
             matchesCurrentUser((row as Schedule & { employeeId?: string }).employeeId, row.employeeName)
         )
       );
-      setClearances(clearanceData.filter((row) => matchesCurrentUser(row.employeeId, row.employeeName)));
+      setClearances(clearanceData.filter((row: Clearance) => matchesCurrentUser(row.employeeId, row.employeeName)));
     } catch {
       setScanError('Unable to load RFID details right now. Please try again.');
     } finally {

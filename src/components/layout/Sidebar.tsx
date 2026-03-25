@@ -60,7 +60,6 @@ export function Sidebar({ user }: Readonly<SidebarProps>) {
     { href: '/dashboard/profile', label: 'My Profile', icon: UserSquare2 },
     { href: '/schedules', label: 'Work Schedule', icon: Calendar },
     { href: '/attendance', label: 'Attendance', icon: Clock },
-    { href: '/clearance', label: 'HR Compliance', icon: FileCheck2 },
   ];
 
   let links = adminLinks;

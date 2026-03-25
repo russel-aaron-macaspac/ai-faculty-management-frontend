@@ -81,11 +81,9 @@ export default function AttendancePage() {
           <Button variant="outline" className="border-slate-200">
             <Filter className="mr-2 h-4 w-4 text-slate-500" /> Filter
           </Button>
-          <Button asChild className="h-10 px-4 bg-red-600 hover:bg-red-700">
-            <Link href="/attendance/rfid/live" className="inline-flex items-center gap-2 font-medium">
-              <Radio className="h-4.5 w-4.5" /> Open RFID Page
-            </Link>
-          </Button>
+          <Link href="/attendance/rfid/live" className="inline-flex items-center gap-2 h-10 px-4 bg-red-600 hover:bg-red-700 rounded-md font-medium text-white">
+            <Radio className="h-4.5 w-4.5" /> Open RFID Page
+          </Link>
         </div>
       </div>
 

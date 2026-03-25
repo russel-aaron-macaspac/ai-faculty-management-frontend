@@ -106,7 +106,7 @@ export default function StaffPage() {
              form.reset({ name: '', department: '', role: '', contactInfo: '', employmentDate: new Date().toISOString().split('T')[0], status: 'active' });
           }
         }}>
-          <DialogTrigger asChild>
+          <DialogTrigger>
              <Button className="bg-red-600 hover:bg-red-700">
                <Plus className="mr-2 h-4 w-4" /> Add Staff
              </Button>
