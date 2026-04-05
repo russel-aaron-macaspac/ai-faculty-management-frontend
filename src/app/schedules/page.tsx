@@ -136,9 +136,11 @@ export default function SchedulesPage() {
     }
   };
 
+  const userName = (user as User & { full_name?: string | null })?.full_name ?? user?.name;
+
   const filtered = schedules.filter(s => {
     // If the user is not an admin, they can only see their own schedules
-    if (user && user.role !== 'admin' && s.employeeName !== user.name) {
+    if (user && user.role !== 'admin' && userName && s.employeeName !== userName) {
       return false;
     }
 
