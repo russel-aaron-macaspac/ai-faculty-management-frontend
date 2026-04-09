@@ -18,7 +18,7 @@ import { formatTimeToTwelveHour } from '@/lib/timeUtils';
 
 export default function LiveRFIDPage() {
   const { user, isLoading } = useRoleBasedAccess({
-    allowedRoles: ['faculty', 'staff', 'dlrc', 'pmo', 'laboratory', 'ict', 'ceso', 'programchair', 'dean', 'registrar', 'ovprel', 'ovpaa', 'account', 'treasury', 'hro'],
+    allowedRoles: ['faculty', 'dlrc', 'pmo', 'laboratory', 'ict', 'ceso', 'programchair', 'dean', 'registrar', 'ovprel', 'ovpaa', 'account', 'treasury', 'hro'],
     redirectTo: '/dashboard/admin',
   });
 

@@ -165,10 +165,6 @@ export const getDashboardPathForRole = (role: string | undefined): string => {
     return '/dashboard/faculty';
   }
 
-  if (role === 'staff') {
-    return '/dashboard/staff';
-  }
-
   const officer = role ? getApprovalOfficerConfig(role) : undefined;
   if (officer) {
     return officer.dashboardPath;

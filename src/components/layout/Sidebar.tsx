@@ -38,7 +38,6 @@ export function Sidebar({ user }: Readonly<SidebarProps>) {
   const adminLinks = [
     { href: '/dashboard/admin', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/faculty', label: 'Faculty Management', icon: Users },
-    { href: '/staff', label: 'Staff Management', icon: UserSquare2 },
     { href: '/schedules', label: 'Scheduling', icon: Calendar },
     { href: '/attendance', label: 'Attendance Monitoring', icon: Clock },
     { href: '/clearance', label: 'Clearance Compliance', icon: FileCheck2 },
@@ -54,19 +53,9 @@ export function Sidebar({ user }: Readonly<SidebarProps>) {
     { href: '/clearance', label: 'Clearance Status', icon: FileCheck2 },
   ];
 
-  // Staff Links
-  const staffLinks = [
-    { href: '/dashboard/staff', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/dashboard/profile', label: 'My Profile', icon: UserSquare2 },
-    { href: '/schedules', label: 'Work Schedule', icon: Calendar },
-    { href: '/attendance', label: 'Attendance', icon: Clock },
-  ];
-
   let links = adminLinks;
   if (user?.role === 'faculty') {
     links = facultyLinks;
-  } else if (user?.role === 'staff') {
-    links = staffLinks;
   } else if (isApprovalOfficer(user?.role)) {
     // Dynamically create links for approval officers
     const officerConfig = getApprovalOfficerConfig(user?.role as string);

@@ -34,9 +34,9 @@ export default function ProfilePage() {
   if (user.role === 'faculty') {
     department = 'Computer Science';
     position = 'Associate Professor';
-  } else if (user.role === 'staff' || isApprovalOfficer(user.role)) {
+  } else if (isApprovalOfficer(user.role)) {
     department = 'Administration';
-    position = 'Office Manager';
+    position = 'Officer';
   }
 
   const profileDetails = {

@@ -12,18 +12,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarPlus, Trash2, Loader2, Search, AlertTriangle, Key, AlertCircle, Edit2 } from 'lucide-react';
+import { CalendarPlus, Trash2, Loader2, Search, AlertTriangle, AlertCircle, Edit2 } from 'lucide-react';
 import { User } from '@/types/user';
 import { parseTimeToMinutes, formatTimeToTwelveHour, subtractMinutesFromTime } from '@/lib/timeUtils';
-
-interface RoomAccessTask {
-  id: string;
-  room: string;
-  professor: string;
-  prepTime: string;
-  classTime: string;
-  subject: string;
-}
 
 const scheduleSchema = z.object({
   employeeId: z.string().min(1, { message: 'Employee is required' }),
@@ -148,25 +139,6 @@ export default function SchedulesPage() {
            s.subjectOrRole.toLowerCase().includes(searchTerm.toLowerCase()) ||
            s.dayOfWeek.toLowerCase().includes(searchTerm.toLowerCase());
   });
-
-  const roomAccessTasks = useMemo(() => {
-    const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-
-    return schedules
-      .filter((schedule) => schedule.type === 'class' && schedule.dayOfWeek === currentDay)
-      .sort((a, b) => (parseTimeToMinutes(a.startTime) ?? 0) - (parseTimeToMinutes(b.startTime) ?? 0))
-      .map((classSchedule, index) => {
-        const prepTime = subtractMinutesFromTime(classSchedule.startTime, 5);
-        return {
-          id: `room-${index}`,
-          room: classSchedule.room || `Room ${index + 1}`,
-          professor: classSchedule.employeeName || 'Professor',
-          prepTime: formatTimeToTwelveHour(prepTime),
-          classTime: formatTimeToTwelveHour(classSchedule.startTime),
-          subject: classSchedule.subjectOrRole || 'Class',
-        } as RoomAccessTask;
-      });
-  }, [schedules]);
 
   return (
     <div className="space-y-6">
@@ -333,41 +305,6 @@ export default function SchedulesPage() {
           </Dialog>
         )}
       </div>
-
-      {user?.role === 'staff' && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-4 border-b border-slate-100">
-            <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <Key className="h-5 w-5 text-red-600" />
-              Room Access Schedule
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">Open rooms 5 minutes before each faculty class.</p>
-          </div>
-
-          <div className="p-4 space-y-3">
-            {roomAccessTasks.length === 0 ? (
-              <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                <AlertCircle className="h-5 w-5 text-slate-400" />
-                <p className="text-sm text-slate-600">No faculty classes scheduled for today.</p>
-              </div>
-            ) : (
-              roomAccessTasks.map((task) => (
-                <div key={task.id} className="flex justify-between items-center p-4 rounded-lg border border-slate-100 hover:bg-slate-50">
-                  <div>
-                    <p className="font-medium text-slate-900">{task.room}</p>
-                    <p className="text-sm text-slate-600">{task.subject} - Prof. {task.professor}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-red-600">{task.prepTime}</p>
-                    <p className="text-xs text-slate-500">Open room (5 min before)</p>
-                    <p className="text-xs text-slate-500 mt-1">Class: {task.classTime}</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center gap-2">
