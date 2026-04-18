@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { useRoleBasedAccess } from '@/hooks/useRoleBasedAccess';
+import { useRFID, type RFIDScan, type RFIDDevice } from '@/hooks/useRFID';
 import { attendanceService } from '@/services/attendanceService';
 import { scheduleService } from '@/services/scheduleService';
 import { clearanceService } from '@/services/clearanceService';
@@ -13,7 +14,7 @@ import { Schedule } from '@/types/schedule';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Radio, Sparkles, ShieldCheck, CalendarDays, Clock3 } from 'lucide-react';
+import { Loader2, Radio, Sparkles, ShieldCheck, CalendarDays, Clock3, Wifi, WifiOff, Server } from 'lucide-react';
 import { formatTimeToTwelveHour } from '@/lib/timeUtils';
 
 export default function LiveRFIDPage() {
@@ -30,6 +31,19 @@ export default function LiveRFIDPage() {
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [clearances, setClearances] = useState<Clearance[]>([]);
+  const [connectedDevices, setConnectedDevices] = useState<RFIDDevice[]>([]);
+
+  // WebSocket RFID connection
+  const { devices, isConnected, lastScan, error: wsError } = useRFID({
+    autoConnect: true,
+    onScan: (scan: RFIDScan) => {
+      // Auto-process WebSocket scans
+      handleWebSocketScan(scan.uid);
+    },
+    onDeviceUpdate: (updatedDevices: RFIDDevice[]) => {
+      setConnectedDevices(updatedDevices);
+    },
+  });
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const todayWeekday = new Date().toLocaleDateString('en-US', { weekday: 'long' });
@@ -54,20 +68,18 @@ export default function LiveRFIDPage() {
     return sameId || sameName;
   };
 
-  const handleRFIDScan = async () => {
-    if (!scanCode.trim()) {
+  // Process RFID scan (from WebSocket or manual input)
+  const processScan = async (rfidValue: string) => {
+    if (!rfidValue.trim()) {
       setScanError('Please provide an RFID value before scanning.');
       return;
     }
 
     setScanError(null);
-    setIsScanning(true);
+    setScanTimestamp(new Date().toLocaleString());
+    setIsDataLoading(true);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setScanTimestamp(new Date().toLocaleString());
-      setIsDataLoading(true);
-
       const [attendanceData, scheduleData, clearanceData] = await Promise.all([
         attendanceService.getAttendance(today),
         scheduleService.getSchedules(),
@@ -86,8 +98,23 @@ export default function LiveRFIDPage() {
     } catch {
       setScanError('Unable to load RFID details right now. Please try again.');
     } finally {
-      setIsScanning(false);
       setIsDataLoading(false);
+    }
+  };
+
+  // Handle WebSocket RFID scans
+  const handleWebSocketScan = async (uid: string) => {
+    setScanCode(uid);
+    await processScan(uid);
+  };
+
+  const handleRFIDScan = async () => {
+    setIsScanning(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await processScan(scanCode);
+    } finally {
+      setIsScanning(false);
     }
   };
 
@@ -153,7 +180,7 @@ export default function LiveRFIDPage() {
             <Radio className="h-5 w-5 text-red-600" /> RFID Scan Gate
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <Input
               placeholder="Enter RFID card value..."
@@ -168,6 +195,47 @@ export default function LiveRFIDPage() {
           </div>
           {scanTimestamp && <p className="text-sm text-emerald-700">RFID accepted at {scanTimestamp}</p>}
           {scanError && <p className="text-sm text-rose-600">{scanError}</p>}
+          
+          {/* WebSocket Status */}
+          <div className="border-t pt-3 mt-3">
+            <div className="flex items-center gap-2 text-sm">
+              {isConnected ? (
+                <>
+                  <Wifi className="h-4 w-4 text-emerald-600" />
+                  <span className="text-emerald-700">WebSocket Connected - Ready for RFID devices</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="h-4 w-4 text-slate-400" />
+                  <span className="text-slate-500">WebSocket Disconnected - Manual scanning only</span>
+                </>
+              )}
+            </div>
+            
+            {/* Connected Devices */}
+            {connectedDevices.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <p className="text-xs font-medium text-slate-600">Connected Devices:</p>
+                <div className="grid grid-cols-1 gap-2">
+                  {connectedDevices.map((device) => (
+                    <div key={device.id} className="rounded bg-emerald-50 border border-emerald-200 p-2">
+                      <div className="flex items-center gap-2">
+                        <Server className="h-3 w-3 text-emerald-600" />
+                        <span className="text-xs font-medium text-emerald-900">{device.id}</span>
+                      </div>
+                      <p className="text-xs text-emerald-700 ml-5">
+                        {device.location && `Location: ${device.location} | `}
+                        Scans: {device.scanCount}
+                      </p>
+                      {device.lastScan && (
+                        <p className="text-xs text-emerald-600 ml-5">Last scan: {new Date(device.lastScan).toLocaleTimeString()}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
