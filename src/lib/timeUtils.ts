@@ -3,6 +3,51 @@
  * All times are stored as 24-hour HH:MM format, but displayed as 12-hour h:MM AM/PM format
  */
 
+const ATTENDANCE_TIME_ZONE = 'Asia/Manila';
+
+function toDateInAttendanceTimeZone(value: string): Date | null {
+  if (!value) {
+    return null;
+  }
+
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+  const parsed = new Date(hasTimezone ? value : `${value}Z`);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed;
+}
+
+/**
+ * Formats a timestamp for attendance display using the application timezone.
+ * Naive timestamps are treated as UTC so stored attendance rows and live scan
+ * timestamps resolve to the same wall-clock time for users.
+ */
+export const formatAttendanceTimestampToTime = (value?: string | null): string => {
+  if (!value) {
+    return '';
+  }
+
+  const compactTime = value.match(/^([0-9]{2}:[0-9]{2})(?::[0-9]{2}(?:\.[0-9]+)?)?$/);
+  if (compactTime) {
+    return compactTime[1];
+  }
+
+  const parsed = toDateInAttendanceTimeZone(value);
+  if (!parsed) {
+    return value.length >= 16 ? value.slice(11, 16) : value;
+  }
+
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: ATTENDANCE_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(parsed);
+};
+
 /**
  * Converts a time string from 24-hour format to total minutes
  * @param time - Time string in HH:MM format (e.g., "14:30")

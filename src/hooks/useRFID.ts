@@ -16,6 +16,21 @@ export function useRFID(options: UseRFIDOptions = {}) {
   const [lastScan, setLastScan] = useState<RFIDScan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const serviceRef = useRef(getRFIDService());
+  const onScanRef = useRef(onScan);
+  const onDeviceUpdateRef = useRef(onDeviceUpdate);
+  const onErrorRef = useRef(onError);
+
+  useEffect(() => {
+    onScanRef.current = onScan;
+  }, [onScan]);
+
+  useEffect(() => {
+    onDeviceUpdateRef.current = onDeviceUpdate;
+  }, [onDeviceUpdate]);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
   // Connect to WebSocket (only once on mount)
   useEffect(() => {
@@ -25,12 +40,12 @@ export function useRFID(options: UseRFIDOptions = {}) {
 
     const handleScan = (scan: RFIDScan) => {
       setLastScan(scan);
-      onScan?.(scan);
+      onScanRef.current?.(scan);
     };
 
     const handleDeviceUpdate = (updatedDevices: RFIDDevice[]) => {
       setDevices(updatedDevices);
-      onDeviceUpdate?.(updatedDevices);
+      onDeviceUpdateRef.current?.(updatedDevices);
     };
 
     service
@@ -42,7 +57,7 @@ export function useRFID(options: UseRFIDOptions = {}) {
       .catch((err) => {
         const errorMsg = err.message || 'Failed to connect to RFID service';
         setError(errorMsg);
-        onError?.(new Error(errorMsg));
+        onErrorRef.current?.(new Error(errorMsg));
       });
 
     return () => {
@@ -57,11 +72,11 @@ export function useRFID(options: UseRFIDOptions = {}) {
       await service.connect(
         (scan) => {
           setLastScan(scan);
-          onScan?.(scan);
+          onScanRef.current?.(scan);
         },
         (updatedDevices) => {
           setDevices(updatedDevices);
-          onDeviceUpdate?.(updatedDevices);
+          onDeviceUpdateRef.current?.(updatedDevices);
         }
       );
       setIsConnected(true);
@@ -69,9 +84,9 @@ export function useRFID(options: UseRFIDOptions = {}) {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Connection failed';
       setError(errorMsg);
-      onError?.(new Error(errorMsg));
+      onErrorRef.current?.(new Error(errorMsg));
     }
-  }, [onScan, onDeviceUpdate, onError]);
+  }, []);
 
   const disconnect = useCallback(() => {
     serviceRef.current.disconnect();

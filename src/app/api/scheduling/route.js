@@ -3,16 +3,7 @@ import { NextResponse } from "next/server";
 import { detectScheduleConflicts, generateConflictSuggestions } from "@/lib/scheduling/conflictDetection";
 import { getInitialStatusForCreator } from "@/lib/scheduling/approvalWorkflow";
 
-export async function GET(request) {
-  try {
-    const supabase = createSupabaseAdminClient();
-    const { searchParams } = new URL(request.url);
-    const facultyId = searchParams.get("facultyId");
-
-    let query = supabase
-      .from("schedules")
-      .select(
-        `
+const BASE_SCHEDULE_SELECT = `
         id,
         faculty_id,
         subject_id,
@@ -41,8 +32,54 @@ export async function GET(request) {
           name,
           capacity
         )
-      `
-      )
+      `;
+
+const SCHEDULE_SELECT_WITH_SECTION = `
+        id,
+        faculty_id,
+        section,
+        subject_id,
+        room_id,
+        day,
+        start_time,
+        end_time,
+        status,
+        created_by,
+        approved_by,
+        approved_at,
+        remarks,
+        faculty:users!schedules_faculty_id_fkey (
+          user_id,
+          first_name,
+          middle_name,
+          last_name
+        ),
+        subject:subjects!schedules_subject_id_fkey (
+          id,
+          code,
+          name
+        ),
+        room:rooms!schedules_room_id_fkey (
+          id,
+          name,
+          capacity
+        )
+      `;
+
+function isMissingSectionColumnError(error) {
+  const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
+  return message.includes("column") && message.includes("section") && message.includes("does not exist");
+}
+
+export async function GET(request) {
+  try {
+    const supabase = createSupabaseAdminClient();
+    const { searchParams } = new URL(request.url);
+    const facultyId = searchParams.get("facultyId");
+
+    let query = supabase
+      .from("schedules")
+      .select(SCHEDULE_SELECT_WITH_SECTION)
       .order("day", { ascending: true })
       .order("start_time", { ascending: true });
 
@@ -50,7 +87,23 @@ export async function GET(request) {
       query = query.eq("faculty_id", facultyId);
     }
 
-    const { data, error } = await query;
+    let { data, error } = await query;
+
+    if (error && isMissingSectionColumnError(error)) {
+      let fallbackQuery = supabase
+        .from("schedules")
+        .select(BASE_SCHEDULE_SELECT)
+        .order("day", { ascending: true })
+        .order("start_time", { ascending: true });
+
+      if (facultyId) {
+        fallbackQuery = fallbackQuery.eq("faculty_id", facultyId);
+      }
+
+      const fallbackResponse = await fallbackQuery;
+      data = fallbackResponse.data;
+      error = fallbackResponse.error;
+    }
 
     if (error) {
       console.error("[SCHEDULING GET ERROR]", error);
@@ -65,6 +118,7 @@ export async function GET(request) {
       return {
         id: row.id,
         facultyId: String(row.faculty_id),
+        section: row.section ?? null,
         subjectId: row.subject_id,
         roomId: row.room_id,
         day: row.day,
@@ -97,7 +151,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { facultyId, subjectId, roomId, day, startTime, endTime, createdBy, creatorRole } = body;
+    const { facultyId, section, subjectId, roomId, day, startTime, endTime, createdBy, creatorRole } = body;
 
     if (!facultyId || !subjectId || !roomId || !day || !startTime || !endTime || !createdBy) {
       return NextResponse.json(
@@ -139,20 +193,43 @@ export async function POST(request) {
       );
     }
 
-    const { data: inserted, error: insertError } = await supabase
+    const insertPayload = {
+      faculty_id: facultyId,
+      subject_id: subjectId,
+      room_id: roomId,
+      day,
+      start_time: startTime,
+      end_time: endTime,
+      status: getInitialStatusForCreator(creatorRole),
+      created_by: createdBy,
+      ...(section ? { section } : {}),
+    };
+
+    let { data: inserted, error: insertError } = await supabase
       .from("schedules")
-      .insert({
-        faculty_id: facultyId,
-        subject_id: subjectId,
-        room_id: roomId,
-        day,
-        start_time: startTime,
-        end_time: endTime,
-        status: getInitialStatusForCreator(creatorRole),
-        created_by: createdBy,
-      })
+      .insert(insertPayload)
       .select("id")
       .single();
+
+    if (insertError && section && isMissingSectionColumnError(insertError)) {
+      const fallbackInsert = await supabase
+        .from("schedules")
+        .insert({
+          faculty_id: facultyId,
+          subject_id: subjectId,
+          room_id: roomId,
+          day,
+          start_time: startTime,
+          end_time: endTime,
+          status: getInitialStatusForCreator(creatorRole),
+          created_by: createdBy,
+        })
+        .select("id")
+        .single();
+
+      inserted = fallbackInsert.data;
+      insertError = fallbackInsert.error;
+    }
 
     if (insertError) {
       console.error("[SCHEDULING POST ERROR]", insertError);

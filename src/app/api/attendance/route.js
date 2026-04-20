@@ -1,5 +1,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/server-client";
+import { formatAttendanceTimestampToTime } from "@/lib/timeUtils";
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 
 function todayDate() {
   return new Date().toISOString().split("T")[0];
@@ -22,7 +24,7 @@ function resolveStatus(shiftStartTime) {
 
 export async function POST(request) {
   try {
-    const { uid, device_id } = await request.json();
+    const { uid, device_id, timestamp } = await request.json();
 
     if (!uid) {
       return NextResponse.json(
@@ -34,7 +36,7 @@ export async function POST(request) {
     const supabase = createSupabaseAdminClient();
     const normalizedUID = uid.trim().toUpperCase();
     const today = todayDate();
-    const now = new Date().toISOString();
+    const now = typeof timestamp === "string" && timestamp ? timestamp : new Date().toISOString();
 
     // 1. Find user by RFID UID
     const { data: user, error: userError } = await supabase
@@ -86,6 +88,7 @@ export async function POST(request) {
           user_id: user.user_id,
           schedule_id: schedule?.schedule_id ?? null,
           log_date: today,
+          rfid_uid: randomUUID(),
           time_in: now,
           status,
           remarks: `RFID scan via ${device_id ?? "unknown"}`,
@@ -139,7 +142,7 @@ export async function GET(request) {
     const date = searchParams.get("date") ?? todayDate();
     const user_id = searchParams.get("user_id");
     const status = searchParams.get("status");
-    const limit = parseInt(searchParams.get("limit") ?? "100", 10);
+    const limit = Number.parseInt(searchParams.get("limit") ?? "100", 10);
 
     const supabase = createSupabaseAdminClient();
 
@@ -153,7 +156,7 @@ export async function GET(request) {
         status,
         remarks,
         created_at,
-        users (
+        users!fk_attendance_user (
           user_id,
           employee_no,
           first_name,
@@ -173,7 +176,13 @@ export async function GET(request) {
 
     if (error) throw error;
 
-    return NextResponse.json({ date, count: records.length, records });
+    const normalizedRecords = (records || []).map((record) => ({
+      ...record,
+      time_in: formatAttendanceTimestampToTime(record.time_in),
+      time_out: formatAttendanceTimestampToTime(record.time_out),
+    }));
+
+    return NextResponse.json({ date, count: normalizedRecords.length, records: normalizedRecords });
   } catch (err) {
     console.error("[ATTENDANCE ERROR]", err);
     return NextResponse.json(

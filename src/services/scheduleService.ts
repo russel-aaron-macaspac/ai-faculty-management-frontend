@@ -2,6 +2,7 @@ import { FacultyAvailability, Schedule } from '@/types/schedule';
 
 interface CreateSchedulePayload {
   facultyId: string;
+  section?: string;
   subjectId: string;
   roomId: string;
   day: string;
@@ -19,6 +20,10 @@ interface SubjectPayload {
 interface RoomPayload {
   name: string;
   capacity: number;
+}
+
+interface SectionPayload {
+  name: string;
 }
 
 interface SchedulingConflictResponse {
@@ -49,6 +54,7 @@ export const scheduleService = {
     faculties: Array<{ id: string; name: string; role: string }>;
     subjects: Array<{ id: string; code: string; name: string }>;
     rooms: Array<{ id: string; name: string; capacity: number }>;
+    sections: Array<{ id: string; name: string }>;
   }> {
     const res = await fetch('/api/scheduling/meta');
 
@@ -222,6 +228,47 @@ export const scheduleService = {
     if (!res.ok) {
       const { error } = await res.json();
       throw new Error(error ?? 'Failed to delete room');
+    }
+
+    return res.json();
+  },
+
+  async createSection(values: SectionPayload) {
+    const res = await fetch('/api/scheduling/sections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(values),
+    });
+
+    if (!res.ok) {
+      const { error } = await res.json();
+      throw new Error(error ?? 'Failed to create section');
+    }
+
+    return res.json();
+  },
+
+  async updateSection(id: string, values: Partial<SectionPayload>) {
+    const res = await fetch(`/api/scheduling/sections/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(values),
+    });
+
+    if (!res.ok) {
+      const { error } = await res.json();
+      throw new Error(error ?? 'Failed to update section');
+    }
+
+    return res.json();
+  },
+
+  async deleteSection(id: string) {
+    const res = await fetch(`/api/scheduling/sections/${id}`, { method: 'DELETE' });
+
+    if (!res.ok) {
+      const { error } = await res.json();
+      throw new Error(error ?? 'Failed to delete section');
     }
 
     return res.json();

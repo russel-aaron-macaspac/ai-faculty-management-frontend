@@ -38,6 +38,7 @@ interface SchedulingMeta {
   faculties: Array<{ id: string; name: string; role: string }>;
   subjects: Array<{ id: string; code: string; name: string }>;
   rooms: Array<{ id: string; name: string; capacity: number }>;
+  sections: Array<{ id: string; name: string }>;
 }
 
 export default function SchedulesPage() {
@@ -46,7 +47,7 @@ export default function SchedulesPage() {
   const [saving, setSaving] = useState(false);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<Schedule[]>([]);
-  const [meta, setMeta] = useState<SchedulingMeta>({ faculties: [], subjects: [], rooms: [] });
+  const [meta, setMeta] = useState<SchedulingMeta>({ faculties: [], subjects: [], rooms: [], sections: [] });
   const [availabilityRows, setAvailabilityRows] = useState<Array<{ day: string; startTime: string; endTime: string }>>([]);
   const [selectedFacultyId, setSelectedFacultyId] = useState<string>('');
   const [selectedFacultyAvailability, setSelectedFacultyAvailability] = useState<Array<{ day: string; startTime: string; endTime: string }>>([]);
@@ -62,6 +63,7 @@ export default function SchedulesPage() {
 
   const [assignment, setAssignment] = useState({
     facultyId: '',
+    section: '',
     subjectId: '',
     roomId: '',
     day: 'Monday',
@@ -72,6 +74,7 @@ export default function SchedulesPage() {
   const [newSubjectName, setNewSubjectName] = useState('');
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomCapacity, setNewRoomCapacity] = useState('');
+  const [newSectionName, setNewSectionName] = useState('');
 
   const currentUserName = user?.full_name || user?.name || '';
   const isProgramChair = user?.role === 'program_chair';
@@ -205,7 +208,7 @@ export default function SchedulesPage() {
 
   const handleCreateSchedule = async () => {
     if (!user) return;
-    if (!assignment.facultyId || !assignment.subjectId || !assignment.roomId || !assignment.startTime || !assignment.endTime) {
+    if (!assignment.facultyId || !assignment.section || !assignment.subjectId || !assignment.roomId || !assignment.startTime || !assignment.endTime) {
       alert('Please complete all schedule fields.');
       return;
     }
@@ -226,6 +229,7 @@ export default function SchedulesPage() {
       setConflictResult(null);
       setAssignment({
         facultyId: '',
+        section: '',
         subjectId: '',
         roomId: '',
         day: 'Monday',
@@ -385,6 +389,58 @@ export default function SchedulesPage() {
     }
   };
 
+  const handleCreateSection = async () => {
+    if (!newSectionName.trim()) {
+      alert('Enter a section name.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await scheduleService.createSection({
+        name: newSectionName.trim(),
+      });
+
+      setNewSectionName('');
+      await loadData(user);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to create section');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdateSection = async (id: string, currentName: string) => {
+    const nameInput = prompt('Section name', currentName);
+    if (nameInput === null) return;
+
+    setSaving(true);
+    try {
+      await scheduleService.updateSection(id, {
+        name: nameInput.trim(),
+      });
+      await loadData(user);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to update section');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteSection = async (id: string) => {
+    if (!confirm('Delete this section?')) return;
+
+    setSaving(true);
+    try {
+      await scheduleService.deleteSection(id);
+      await loadData(user);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to delete section');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const scheduleTableRows = (() => {
     if (loading) {
       return (
@@ -409,7 +465,10 @@ export default function SchedulesPage() {
     return visibleSchedules.map((item) => (
       <TableRow key={item.id}>
         <TableCell>{item.facultyName}</TableCell>
-        <TableCell>{item.subject?.code} - {item.subject?.name}</TableCell>
+        <TableCell>
+          {item.subject?.code} - {item.subject?.name}
+          {item.section ? <span className="ml-2 text-xs text-slate-500">Section {item.section}</span> : null}
+        </TableCell>
         <TableCell>{item.room?.name}</TableCell>
         <TableCell>{item.day}</TableCell>
         <TableCell>
@@ -564,6 +623,25 @@ export default function SchedulesPage() {
                         {meta.rooms.map((room) => (
                           <SelectItem key={room.id} value={room.id}>
                             {room.name} (cap {room.capacity})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <div className="text-sm font-medium">Section</div>
+                    <Select
+                      value={assignment.section}
+                      onValueChange={(value) => setAssignment((prev) => ({ ...prev, section: value || '' }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select section" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {meta.sections.map((section) => (
+                          <SelectItem key={section.id} value={section.name}>
+                            {section.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -741,6 +819,43 @@ export default function SchedulesPage() {
                     )}
                   </div>
                 </div>
+
+                <div className="space-y-3">
+                  <div className="text-sm font-semibold text-slate-800">Add Section</div>
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_140px]">
+                    <Input
+                      placeholder="Section name (e.g. 1A)"
+                      value={newSectionName}
+                      onChange={(event) => setNewSectionName(event.target.value)}
+                    />
+                    <Button type="button" onClick={handleCreateSection} disabled={saving}>Add Section</Button>
+                  </div>
+                  <div className="space-y-2">
+                    {meta.sections.length === 0 ? (
+                      <div className="text-sm text-slate-500">No sections yet.</div>
+                    ) : (
+                      meta.sections.map((section) => (
+                        <div key={section.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+                          <div className="text-sm text-slate-800">
+                            <span className="font-medium">{section.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUpdateSection(section.id, section.name)}
+                            >
+                              Edit
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => handleDeleteSection(section.id)}>
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -831,7 +946,10 @@ export default function SchedulesPage() {
                   pendingApprovals.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>{item.facultyName}</TableCell>
-                      <TableCell>{item.subject?.code} - {item.subject?.name}</TableCell>
+                      <TableCell>
+                        {item.subject?.code} - {item.subject?.name}
+                        {item.section ? <span className="ml-2 text-xs text-slate-500">Section {item.section}</span> : null}
+                      </TableCell>
                       <TableCell>
                         {item.day} {formatTimeToTwelveHour(item.startTime)} - {formatTimeToTwelveHour(item.endTime)}
                       </TableCell>

@@ -1,23 +1,19 @@
 import { Server as SocketIOServer } from 'socket.io';
-import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/server-client';
 
 // Store active devices and sockets
 const activeDevices = new Map();
-const deviceSockets = new Map();
 let ioInstance: SocketIOServer | null = null;
 
 // Get or create Socket.IO instance
 export function getSocketIOInstance() {
-  if (!ioInstance) {
-    ioInstance = new SocketIOServer({
+  ioInstance ??= new SocketIOServer({
       cors: {
         origin: '*',
         methods: ['GET', 'POST'],
       },
       transports: ['websocket', 'polling'],
     });
-  }
   return ioInstance;
 }
 
@@ -30,7 +26,7 @@ export async function registerDevice(socket: any, deviceData: any) {
   // Check if device exists
   let device = activeDevices.get(deviceId);
 
-  if (!device) {
+  if (device === undefined) {
     // Create new device in database
     const { data, error } = await supabase
       .from('rfid_devices')
@@ -69,8 +65,6 @@ export async function registerDevice(socket: any, deviceData: any) {
     connectedAt: new Date().toISOString(),
   });
 
-  deviceSockets.set(deviceId, socket);
-
   socket.join(`device:${deviceId}`);
   socket.emit('device_registered', { deviceId, success: true });
 
@@ -90,7 +84,7 @@ export async function handleRFIDScan(socket: any, scanData: any) {
   const supabase = createSupabaseAdminClient();
 
   const normalizedUID = uid.trim().toUpperCase();
-  const scanTimestamp = new Date().toISOString();
+  const scanTimestamp = scanData.timestamp || new Date().toISOString();
 
   try {
     // Find user by RFID UID
@@ -145,20 +139,38 @@ export async function handleRFIDScan(socket: any, scanData: any) {
       status = new Date() > shiftStart ? 'late' : 'present';
     }
 
-    // Record attendance
-    const { data: attendance, error: attendanceError } = await supabase
+    const { data: openAttendance, error: openAttendanceError } = await supabase
       .from('attendance')
-      .insert({
-        user_id: user.user_id,
-        date: today,
-        time_in: new Date().toLocaleTimeString('en-US', { hour12: false }),
-        device_id: deviceId,
-        status,
-      })
-      .select()
-      .single();
+      .select('id, time_in, time_out, status')
+      .eq('user_id', user.user_id)
+      .eq('date', today)
+      .is('time_out', null)
+      .order('time_in', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (attendanceError) throw attendanceError;
+    if (openAttendanceError) throw openAttendanceError;
+
+    if (openAttendance) {
+      const { error: updateError } = await supabase
+        .from('attendance')
+        .update({ time_out: scanTimestamp })
+        .eq('id', openAttendance.id);
+
+      if (updateError) throw updateError;
+    } else {
+      const { error: attendanceError } = await supabase
+        .from('attendance')
+        .insert({
+          user_id: user.user_id,
+          date: today,
+          time_in: scanTimestamp,
+          device_id: deviceId,
+          status,
+        });
+
+      if (attendanceError) throw attendanceError;
+    }
 
     // Record scan event
     const successfulScan = {
@@ -212,7 +224,6 @@ export async function handleDeviceDisconnect(deviceId: string) {
   const supabase = createSupabaseAdminClient();
 
   activeDevices.delete(deviceId);
-  deviceSockets.delete(deviceId);
 
   // Update device status to offline
   await supabase

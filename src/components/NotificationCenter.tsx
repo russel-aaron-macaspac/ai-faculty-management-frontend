@@ -84,7 +84,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId }
                   {notification.message}
                 </p>
                 <p className="text-xs text-slate-500 mt-2">
-                  {format(new Date(notification.created_at), 'MMM d, yyyy HH:mm')}
+                  {format(new Date(notification.created_at), 'MMM d, yyyy h:mm a')}
                 </p>
               </div>
               {!notification.is_read && (

@@ -2,6 +2,7 @@ export interface Schedule {
   id: string;
   facultyId: string;
   facultyName: string;
+  section?: string | null;
   subjectId: string;
   roomId: string;
   day: string;
@@ -30,6 +31,7 @@ export interface Schedule {
   };
 
   // Backward-compatible fields still used by dashboard widgets.
+  employeeId?: string;
   employeeName?: string;
   dayOfWeek?: string;
   subjectOrRole?: string;

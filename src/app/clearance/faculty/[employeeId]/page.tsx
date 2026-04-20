@@ -527,7 +527,7 @@ export default function FacultyDetailPage() {
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-slate-800">{note.author_name}</span>
                         <span className="text-xs text-slate-500">
-                          {format(new Date(note.created_at), 'MMM d, yyyy HH:mm')}
+                          {format(new Date(note.created_at), 'MMM d, yyyy h:mm a')}
                         </span>
                       </div>
                       <p className="text-slate-700">{note.content}</p>

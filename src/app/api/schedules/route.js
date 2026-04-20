@@ -54,6 +54,7 @@ export async function GET() {
 
       return {
         id:             String(s.schedule_id),
+        employeeId:     String(s.user?.user_id ?? ''),
         employeeName:   fullName,
         type:           s.type ?? "shift",
         subjectOrRole:  s.subject_or_role ?? "",
