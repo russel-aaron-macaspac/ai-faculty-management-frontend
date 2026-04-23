@@ -19,6 +19,17 @@ export interface RFIDScan {
   userName?: string;
   status: 'success' | 'failed' | 'not_registered';
   reason?: string;
+  analysis?: {
+    status?: string;
+    message?: string;
+    recommendation?: string;
+    deviceRoom?: string;
+    schedule?: {
+      startTime?: string | null;
+      endTime?: string | null;
+      roomId?: string | null;
+    };
+  };
 }
 
 export interface DeviceMetrics {

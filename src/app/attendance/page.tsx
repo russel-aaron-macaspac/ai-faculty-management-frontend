@@ -6,7 +6,7 @@ import { Attendance } from '@/types/attendance';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { Loader2, Search, AlertTriangle, Filter, Sparkles } from 'lucide-react';
+import { Loader2, Search, AlertTriangle, Filter, Sparkles, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 import { StoredUser, normalize } from '@/lib/stringUtils';
 import { formatTimeToTwelveHour, formatAttendanceTimestampToTime } from '@/lib/timeUtils';
@@ -19,12 +19,115 @@ type LatestScanSummary = {
   status: 'success' | 'failed' | 'not_registered';
   timestamp: string;
   reason?: string | null;
+  analysis?: ScanAnalysis | null;
   user?: {
     first_name?: string | null;
     middle_name?: string | null;
     last_name?: string | null;
   } | null;
 };
+
+type ScanAnalysis = {
+  status?: string;
+  message?: string;
+  recommendation?: string;
+  deviceRoom?: string;
+  schedule?: {
+    startTime?: string | null;
+    endTime?: string | null;
+    roomId?: string | null;
+  };
+};
+
+type ScanValidationTone = 'emerald' | 'amber' | 'rose' | 'slate';
+
+type ScanValidationSummary = {
+  title: string;
+  tone: ScanValidationTone;
+  details: string[];
+};
+
+const VALIDATION_TONE_CLASSES: Record<ScanValidationTone, string> = {
+  emerald: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  amber: 'bg-amber-50 text-amber-800 border-amber-200',
+  rose: 'bg-rose-50 text-rose-800 border-rose-200',
+  slate: 'bg-slate-50 text-slate-700 border-slate-200',
+};
+
+function toScheduleTimeLabel(value?: string | null): string {
+  if (!value) {
+    return 'N/A';
+  }
+
+  if (value.includes('T')) {
+    return formatTimeToTwelveHour(formatAttendanceTimestampToTime(value));
+  }
+
+  const clock = value.slice(0, 5);
+  return formatTimeToTwelveHour(clock);
+}
+
+function buildScanValidationSummary(scan: {
+  status: 'success' | 'failed' | 'not_registered';
+  reason?: string;
+  analysis?: ScanAnalysis | null;
+}): ScanValidationSummary {
+  const analysis = scan.analysis ?? null;
+  const status = analysis?.status ?? null;
+  const reason = scan.reason?.trim();
+
+  if (scan.status === 'not_registered') {
+    return {
+      title: 'Validation unavailable: unregistered card',
+      tone: 'slate',
+      details: [reason || 'Card is not linked to an active user account.'],
+    };
+  }
+
+  if (status === 'wrong_room') {
+    const expectedRoom = analysis?.schedule?.roomId || 'assigned room';
+    const scheduleWindow = `${toScheduleTimeLabel(analysis?.schedule?.startTime)} - ${toScheduleTimeLabel(analysis?.schedule?.endTime)}`;
+
+    return {
+      title: 'Room validation failed',
+      tone: 'rose',
+      details: [
+        analysis?.message || reason || 'Scanned device room does not match scheduled room.',
+        `Expected room: ${expectedRoom} | Device room: ${analysis?.deviceRoom || 'Unknown'}`,
+        `Scheduled time window: ${scheduleWindow}`,
+        analysis?.recommendation || 'Proceed to your assigned room and rescan.',
+      ],
+    };
+  }
+
+  if (status === 'unauthorized_access' || status === 'outside_schedule' || status === 'no_schedule') {
+    return {
+      title: 'Schedule validation warning',
+      tone: 'amber',
+      details: [
+        analysis?.message || reason || 'Scan has schedule constraints to review.',
+        analysis?.recommendation || 'Review schedule assignment before finalizing this attendance.',
+      ],
+    };
+  }
+
+  if (scan.status === 'failed') {
+    return {
+      title: 'Scan failed',
+      tone: 'rose',
+      details: [reason || analysis?.message || 'Scan could not be validated.'],
+    };
+  }
+
+  return {
+    title: 'Room validation passed',
+    tone: 'emerald',
+    details: [
+      analysis?.message || 'Scan is aligned with the scheduled room constraints.',
+      analysis?.deviceRoom ? `Validated device room: ${analysis.deviceRoom}` : 'Device room validated from configured RFID device mapping.',
+    ],
+  };
+}
 
 function fullNameFromScan(scan?: LatestScanSummary | null): string {
   const value = [scan?.user?.first_name, scan?.user?.middle_name, scan?.user?.last_name]
@@ -274,6 +377,7 @@ export default function AttendancePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDate, setFilterDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [lastScanMessage, setLastScanMessage] = useState<string | null>(null);
+  const [lastScanValidation, setLastScanValidation] = useState<ScanValidationSummary | null>(null);
   const [activeScannedUserId, setActiveScannedUserId] = useState<string | null>(null);
   const lastSeenScanId = useRef<string | null>(null);
   const [currentUser] = useState<StoredUser | null>(() => {
@@ -339,6 +443,7 @@ export default function AttendancePage() {
     userId?: number;
     reason?: string;
     fullName?: string;
+    analysis?: ScanAnalysis | null;
   }) => {
     const scannedUserId = scan.userId ? String(scan.userId) : null;
     const isOwnScan = scannedUserId !== null && currentUserId !== '' && scannedUserId === currentUserId;
@@ -358,6 +463,7 @@ export default function AttendancePage() {
     setLastScanMessage(
       `Card ${scan.uid} scanned (${scan.status}) at ${formatTimeToTwelveHour(formatAttendanceTimestampToTime(scan.timestamp))}${detailsSuffix}`
     );
+    setLastScanValidation(buildScanValidationSummary(scan));
     setActiveScannedUserId(scannedUserId);
     setRefreshingFromScan(true);
 
@@ -392,6 +498,7 @@ export default function AttendancePage() {
         userId: scan.userId,
         reason: scan.reason,
         fullName: scan.userName,
+        analysis: scan.analysis,
       });
     },
   });
@@ -417,6 +524,7 @@ export default function AttendancePage() {
         userId: latest.user_id ?? undefined,
         reason: latest.reason ?? undefined,
         fullName: fullNameFromScan(latest),
+        analysis: latest.analysis ?? null,
       });
     };
 
@@ -555,6 +663,24 @@ export default function AttendancePage() {
           <div className="px-4 py-3 border-b border-slate-100 bg-emerald-50/70 flex items-center justify-between gap-3">
             <p className="text-sm text-emerald-800">{lastScanMessage ?? 'Refreshing attendance from live RFID scan...'}</p>
             {refreshingFromScan && <Loader2 className="h-4 w-4 animate-spin text-emerald-700" />}
+          </div>
+        )}
+
+        {lastScanValidation && (
+          <div className={`px-4 py-3 border-b ${VALIDATION_TONE_CLASSES[lastScanValidation.tone]}`}>
+            <div className="flex items-center gap-2 font-semibold text-sm">
+              {lastScanValidation.tone === 'emerald' ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : (
+                <ShieldAlert className="h-4 w-4" />
+              )}
+              {lastScanValidation.title}
+            </div>
+            <div className="mt-1 space-y-1 text-xs leading-5">
+              {lastScanValidation.details.map((detail) => (
+                <p key={detail}>{detail}</p>
+              ))}
+            </div>
           </div>
         )}
 

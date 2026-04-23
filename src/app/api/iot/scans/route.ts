@@ -38,6 +38,34 @@ type AttendanceResult = {
   status: AttendanceStatus;
 };
 
+type PersistedScanStatus = 'success' | 'failed' | 'not_registered';
+
+function shouldBlockAttendanceFromAnalysis(status?: string | null): boolean {
+  return status === 'wrong_room';
+}
+
+function resolvePersistedScanStatus(params: {
+  resolvedUserId: number | null;
+  requestedStatus: unknown;
+  blockedByScheduleRoom: boolean;
+}): PersistedScanStatus {
+  const { resolvedUserId, requestedStatus, blockedByScheduleRoom } = params;
+
+  if (!resolvedUserId) {
+    return 'not_registered';
+  }
+
+  if (blockedByScheduleRoom) {
+    return 'failed';
+  }
+
+  if (requestedStatus === 'failed' || requestedStatus === 'not_registered') {
+    return requestedStatus;
+  }
+
+  return 'success';
+}
+
 async function resolveUserFromScan(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
   normalizedUID: string,
@@ -310,17 +338,29 @@ export async function POST(request: NextRequest) {
             scanTimestamp,
           });
     const attendanceStatus: AttendanceStatus = aiResponse?.status === 'late' ? 'late' : 'present';
-    const attendance = await applyAttendanceLog(
-      supabase,
-      resolvedUserId,
-      deviceId,
-      scanTimestamp,
-      attendanceStatus
-    );
+    const blockedByScheduleRoom = shouldBlockAttendanceFromAnalysis(aiResponse?.status);
+
+    let attendance: AttendanceResult = { action: 'NONE', status: attendanceStatus };
+    if (!blockedByScheduleRoom) {
+      attendance = await applyAttendanceLog(
+        supabase,
+        resolvedUserId,
+        deviceId,
+        scanTimestamp,
+        attendanceStatus
+      );
+    }
 
     const fallbackReason = resolvedUserId ? null : 'Card not registered or user inactive';
+    const validationReason = blockedByScheduleRoom
+      ? aiResponse?.message || 'Scan failed: room mismatch against active schedule'
+      : null;
 
-    const persistedScanStatus = resolvedUserId ? (status ?? 'success') : 'not_registered';
+    const persistedScanStatus = resolvePersistedScanStatus({
+      resolvedUserId,
+      requestedStatus: status,
+      blockedByScheduleRoom,
+    });
 
     const { data: scan, error } = await supabase
       .from('rfid_scans')
@@ -330,7 +370,7 @@ export async function POST(request: NextRequest) {
         user_id: resolvedUserId,
         timestamp: scanTimestamp,
         status: persistedScanStatus,
-        reason: reason ?? fallbackReason,
+        reason: reason ?? validationReason ?? fallbackReason,
       })
       .select()
       .single();

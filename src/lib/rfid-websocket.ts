@@ -130,6 +130,42 @@ export async function handleRFIDScan(socket: any, scanData: any) {
       scanTimestamp,
     });
 
+    if (aiResponse.status === 'wrong_room') {
+      const blockedScan = {
+        deviceId,
+        uid: normalizedUID,
+        timestamp: scanTimestamp,
+        userId: user.user_id,
+        userName: `${user.first_name} ${user.last_name}`,
+        status: 'failed',
+        reason: aiResponse.message,
+        analysis: aiResponse,
+      };
+
+      await supabase.from('rfid_scans').insert({
+        device_id: deviceId,
+        uid: normalizedUID,
+        user_id: user.user_id,
+        timestamp: scanTimestamp,
+        status: 'failed',
+        reason: aiResponse.message,
+      });
+
+      await logValidationAlert(supabase, {
+        userId: user.user_id,
+        deviceId,
+        aiResponse,
+      });
+
+      socket.emit('scan_result', {
+        ...blockedScan,
+        success: false,
+      });
+
+      socket.broadcast.emit('rfid_scan', blockedScan);
+      return;
+    }
+
     const status = aiResponse.status === 'late' ? 'late' : 'present';
 
     const { data: openAttendance, error: openAttendanceError } = await supabase

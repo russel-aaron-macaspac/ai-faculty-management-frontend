@@ -85,6 +85,23 @@ function normalizeText(value: string | null | undefined) {
   return (value || '').trim().toLowerCase();
 }
 
+function normalizeRoomLabel(value: string | null | undefined): string {
+  return normalizeText(value).replace(/[^a-z0-9]/g, '');
+}
+
+function hasRoomMetadata(deviceRoom: DeviceRoomInfo): boolean {
+  return Boolean(deviceRoom.roomId || deviceRoom.roomName || deviceRoom.location || deviceRoom.display);
+}
+
+function isMissingColumnError(error: { message?: string; details?: string } | null, column: string): boolean {
+  if (!error) {
+    return false;
+  }
+
+  const message = `${error.message || ''} ${error.details || ''}`.toLowerCase();
+  return message.includes('column') && message.includes(column.toLowerCase()) && message.includes('does not exist');
+}
+
 function toStringValue(value: unknown): string | null {
   if (value === null || value === undefined) {
     return null;
@@ -295,14 +312,29 @@ export async function getTodaySchedule(
   const dayName = scanDate.toLocaleDateString('en-US', { weekday: 'long' });
   const scanMinutes = toMinutesFromTimestamp(scanTimestamp) ?? 0;
 
-  const modernResponse = await supabase
+  const { data: facultyRecord } = await supabase
+    .from('users')
+    .select('supabase_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const facultyUuid =
+    facultyRecord &&
+    typeof (facultyRecord as { supabase_id?: unknown }).supabase_id === 'string' &&
+    (facultyRecord as { supabase_id?: string }).supabase_id
+      ? (facultyRecord as { supabase_id?: string }).supabase_id
+      : null;
+
+  let modernQuery = supabase
     .from('schedules')
     .select(
       `
       faculty_id,
+      faculty_id_uuid,
       day,
       start_time,
       end_time,
+      status,
       room_id,
       room:rooms!schedules_room_id_fkey (
         id,
@@ -310,9 +342,46 @@ export async function getTodaySchedule(
       )
     `
     )
-    .eq('faculty_id', userId)
     .eq('day', dayName)
+    .neq('status', 'rejected')
     .order('start_time', { ascending: true });
+
+  if (facultyUuid) {
+    modernQuery = modernQuery.or(`faculty_id.eq.${userId},faculty_id_uuid.eq.${facultyUuid}`);
+  } else {
+    modernQuery = modernQuery.eq('faculty_id', userId);
+  }
+
+  let modernResponse = await modernQuery;
+
+  if (modernResponse.error && isMissingColumnError(modernResponse.error, 'status')) {
+    let fallbackModernQuery = supabase
+      .from('schedules')
+      .select(
+        `
+        faculty_id,
+        faculty_id_uuid,
+        day,
+        start_time,
+        end_time,
+        room_id,
+        room:rooms!schedules_room_id_fkey (
+          id,
+          name
+        )
+      `
+      )
+      .eq('day', dayName)
+      .order('start_time', { ascending: true });
+
+    if (facultyUuid) {
+      fallbackModernQuery = fallbackModernQuery.or(`faculty_id.eq.${userId},faculty_id_uuid.eq.${facultyUuid}`);
+    } else {
+      fallbackModernQuery = fallbackModernQuery.eq('faculty_id', userId);
+    }
+
+    modernResponse = await fallbackModernQuery;
+  }
 
   if (!modernResponse.error && modernResponse.data) {
     const schedules = (modernResponse.data as Array<Record<string, unknown>>).map((row) => {
@@ -437,10 +506,37 @@ export function validateSchedule(
 
   let roomMatches = true;
   if (schedule?.roomId || schedule?.roomName) {
-    if (deviceRoom.roomId && schedule?.roomId) {
-      roomMatches = normalizeText(deviceRoom.roomId) === normalizeText(schedule.roomId);
-    } else if (deviceRoom.display && schedule?.roomName) {
-      roomMatches = normalizeText(deviceRoom.display) === normalizeText(schedule.roomName);
+    const expectedRoomId = normalizeText(schedule.roomId);
+    const expectedRoomName = normalizeText(schedule.roomName);
+    const expectedRoomNameCompact = normalizeRoomLabel(schedule.roomName);
+
+    const deviceRoomIds = [deviceRoom.roomId]
+      .map((value) => normalizeText(value))
+      .filter(Boolean);
+
+    const deviceRoomNames = [deviceRoom.roomName, deviceRoom.location, deviceRoom.display]
+      .map((value) => normalizeText(value))
+      .filter(Boolean);
+
+    const deviceRoomNamesCompact = [deviceRoom.roomName, deviceRoom.location, deviceRoom.display]
+      .map((value) => normalizeRoomLabel(value))
+      .filter(Boolean);
+
+    const hasNameMatch =
+      Boolean(expectedRoomName && deviceRoomNames.includes(expectedRoomName)) ||
+      Boolean(
+        expectedRoomNameCompact &&
+          deviceRoomNamesCompact.some(
+            (value) => value === expectedRoomNameCompact || value.includes(expectedRoomNameCompact) || expectedRoomNameCompact.includes(value)
+          )
+      );
+
+    if (!hasRoomMetadata(deviceRoom)) {
+      roomMatches = false;
+    } else if (expectedRoomId) {
+      roomMatches = deviceRoomIds.includes(expectedRoomId) || hasNameMatch;
+    } else if (expectedRoomName) {
+      roomMatches = hasNameMatch;
     }
   }
 

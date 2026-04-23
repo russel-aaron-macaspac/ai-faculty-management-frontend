@@ -20,13 +20,24 @@ export interface RFIDScan {
   userName?: string;
   status: 'success' | 'failed' | 'not_registered';
   reason?: string;
+  analysis?: {
+    status?: string;
+    message?: string;
+    recommendation?: string;
+    deviceRoom?: string;
+    schedule?: {
+      startTime?: string | null;
+      endTime?: string | null;
+      roomId?: string | null;
+    };
+  };
   signal_strength?: number;
 }
 
 class RFIDService {
   private socket: Socket | null = null;
-  private clientId: string;
-  private messageHandlers: Map<string, (data: any) => void> = new Map();
+  private readonly clientId: string;
+  private readonly messageHandlers: Map<string, (data: any) => void> = new Map();
   private devices: RFIDDevice[] = [];
 
   constructor() {
@@ -39,8 +50,8 @@ class RFIDService {
   connect(onScan?: (scan: RFIDScan) => void, onDeviceUpdate?: (devices: RFIDDevice[]) => void): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        const socketUrl = `${protocol}://${window.location.host}`;
+        const protocol = globalThis.location.protocol === 'https:' ? 'wss' : 'ws';
+        const socketUrl = `${protocol}://${globalThis.location.host}`;
 
         this.socket = io(socketUrl, {
           transports: ['websocket', 'polling'],
@@ -102,7 +113,7 @@ class RFIDService {
    * Send message to server
    */
   send(message: any): void {
-    if (this.socket && this.socket.connected) {
+    if (this.socket?.connected) {
       this.socket.emit(message.type, message.payload);
     } else {
       console.warn('[RFID] Socket.IO not connected');
@@ -194,14 +205,14 @@ class RFIDService {
    * Generate unique client ID
    */
   private generateClientId(): string {
-    return `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return `client-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   }
 
   /**
    * Check if connected
    */
   isConnected(): boolean {
-    return this.socket !== null && this.socket.connected;
+    return this.socket?.connected ?? false;
   }
 }
 
@@ -209,8 +220,6 @@ class RFIDService {
 let rfidService: RFIDService | null = null;
 
 export function getRFIDService(): RFIDService {
-  if (!rfidService) {
-    rfidService = new RFIDService();
-  }
+  rfidService ??= new RFIDService();
   return rfidService;
 }
