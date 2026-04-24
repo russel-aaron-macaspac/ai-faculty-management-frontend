@@ -100,7 +100,18 @@ function buildScanValidationSummary(scan: {
     };
   }
 
-  if (status === 'unauthorized_access' || status === 'outside_schedule' || status === 'no_schedule') {
+  if (status === 'no_schedule') {
+    return {
+      title: 'No schedule detected',
+      tone: 'amber',
+      details: [
+        analysis?.message || reason || 'No schedule found for this user at scan time.',
+        analysis?.recommendation || 'Verify schedule assignment before finalizing this attendance.',
+      ],
+    };
+  }
+
+  if (status === 'unauthorized_access' || status === 'outside_schedule') {
     return {
       title: 'Schedule validation warning',
       tone: 'amber',
@@ -475,7 +486,7 @@ export default function AttendancePage() {
   }, [currentUserId, isAdminUser, loadAttendance, loadRecentRecords]);
 
   const fetchLatestScan = useCallback(async (): Promise<LatestScanSummary | null> => {
-    const response = await fetch('/api/iot/scans?limit=1', { cache: 'no-store' });
+    const response = await fetch('/api/iot/scans?limit=1&includeAnalysis=1', { cache: 'no-store' });
     if (!response.ok) {
       return null;
     }

@@ -255,6 +255,9 @@ export async function GET(request: NextRequest) {
     const uid = searchParams.get('uid');
     const limit = Number.parseInt(searchParams.get('limit') || '100', 10);
     const offset = Number.parseInt(searchParams.get('offset') || '0', 10);
+    const includeAnalysis = ['1', 'true', 'yes'].includes(
+      (searchParams.get('includeAnalysis') || '').toLowerCase()
+    );
 
     const supabase = createSupabaseAdminClient();
 
@@ -293,9 +296,42 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
+    const normalizedScans = scans || [];
+    const scansWithAnalysis = includeAnalysis
+      ? await Promise.all(
+          normalizedScans.map(async (scan) => {
+            if (!scan?.user_id || !scan?.device_id || !scan?.timestamp) {
+              return {
+                ...scan,
+                analysis: null,
+              };
+            }
+
+            try {
+              const analysis = await analyzeScanWithSchedule({
+                supabase,
+                userId: Number(scan.user_id),
+                deviceId: String(scan.device_id),
+                scanTimestamp: String(scan.timestamp),
+              });
+
+              return {
+                ...scan,
+                analysis,
+              };
+            } catch {
+              return {
+                ...scan,
+                analysis: null,
+              };
+            }
+          })
+        )
+      : normalizedScans;
+
     return NextResponse.json({
       success: true,
-      scans: scans || [],
+      scans: scansWithAnalysis,
       total: count || 0,
       limit,
       offset,

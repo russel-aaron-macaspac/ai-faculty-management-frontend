@@ -447,6 +447,7 @@ export async function getDeviceRoom(
     .maybeSingle();
 
   if (response.error || !response.data) {
+    console.warn('[getDeviceRoom] No device data found or error:', response.error);
     return {
       roomId: null,
       roomName: null,
@@ -457,6 +458,7 @@ export async function getDeviceRoom(
 
   const device = response.data as { room_id?: string | number | null; location?: string | null };
   const roomId = device.room_id !== undefined && device.room_id !== null ? String(device.room_id) : null;
+  console.log('[getDeviceRoom] Device:', device, 'Resolved roomId:', roomId);
 
   if (roomId) {
     const roomResponse = await supabase
@@ -464,16 +466,22 @@ export async function getDeviceRoom(
       .select('id, name')
       .eq('id', roomId)
       .maybeSingle();
+    console.log('[getDeviceRoom] Room response:', roomResponse);
 
     if (!roomResponse.error && roomResponse.data) {
       const room = roomResponse.data as { id: string | number; name?: string | null };
+      console.log('[getDeviceRoom] Found room:', room);
       return {
         roomId: String(room.id),
         roomName: room.name ?? null,
         location: device.location ?? null,
         display: room.name || device.location || `Room ${room.id}`,
       };
+    } else {
+      console.warn('[getDeviceRoom] No room found for roomId:', roomId, 'Error:', roomResponse.error);
     }
+  } else {
+    console.warn('[getDeviceRoom] Device has no roomId:', device);
   }
 
   return {
@@ -640,10 +648,10 @@ export function detectBehaviorPatterns(params: {
 
 function getPrimaryStatus(flags: Set<DetectionFlag>): DetectionFlag | 'on_time' {
   const priority: DetectionFlag[] = [
+    'no_schedule',
     'unauthorized_access',
     'wrong_room',
     'outside_schedule',
-    'no_schedule',
     'duplicate_scan',
     'late',
     'early',
