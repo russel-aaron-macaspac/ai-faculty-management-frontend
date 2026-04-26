@@ -69,6 +69,7 @@ type AIResponse = {
   schedule: {
     startTime: string | null;
     endTime: string | null;
+    roomName: string | null;
     roomId: string | null;
   };
   deviceRoom: string;
@@ -739,6 +740,7 @@ export function generateAIResponse(params: {
     schedule: {
       startTime: schedule?.startTime ?? null,
       endTime: schedule?.endTime ?? null,
+      roomName: schedule?.roomName ?? null,
       roomId: schedule?.roomId ?? null,
     },
     deviceRoom: deviceRoom.display,

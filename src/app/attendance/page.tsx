@@ -35,6 +35,7 @@ type ScanAnalysis = {
   schedule?: {
     startTime?: string | null;
     endTime?: string | null;
+    roomName?: string | null;
     roomId?: string | null;
   };
 };
@@ -85,7 +86,8 @@ function buildScanValidationSummary(scan: {
   }
 
   if (status === 'wrong_room') {
-    const expectedRoom = analysis?.schedule?.roomId || 'assigned room';
+    const expectedRoom =
+      analysis?.schedule?.roomName || analysis?.schedule?.roomId || 'assigned room';
     const scheduleWindow = `${toScheduleTimeLabel(analysis?.schedule?.startTime)} - ${toScheduleTimeLabel(analysis?.schedule?.endTime)}`;
 
     return {

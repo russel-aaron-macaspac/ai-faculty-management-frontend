@@ -27,6 +27,7 @@ export interface RFIDScan {
     schedule?: {
       startTime?: string | null;
       endTime?: string | null;
+      roomName?: string | null;
       roomId?: string | null;
     };
   };
