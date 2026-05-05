@@ -353,7 +353,9 @@ export async function getTodaySchedule(
     modernQuery = modernQuery.eq('faculty_id', userId);
   }
 
-  let modernResponse = await modernQuery;
+  // modernResponse may have different shapes depending on whether the `status` column exists in the DB.
+  // Use `any` here to accept both variants and handle shape normalization below.
+  let modernResponse: any = await modernQuery;
 
   if (modernResponse.error && isMissingColumnError(modernResponse.error, 'status')) {
     let fallbackModernQuery = supabase
