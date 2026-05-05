@@ -118,6 +118,29 @@ export default function FacultyDashboardPage() {
     return alerts;
   };
 
+  const [insights, setInsights] = useState<any[] | null>(null);
+  const [insightsMeta, setInsightsMeta] = useState<any | null>(null);
+
+  useEffect(() => {
+    const fetchInsights = async () => {
+      try {
+        const stored = localStorage.getItem('user');
+        const userObj = stored ? JSON.parse(stored) : null;
+        const userId = userObj?.id ? String(userObj.id) : undefined;
+        const url = userId ? `/api/ai/insights?user_id=${encodeURIComponent(userId)}` : '/api/ai/insights';
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) return;
+        const payload = await res.json();
+        if (Array.isArray(payload.alerts)) setInsights(payload.alerts);
+        if (payload.meta) setInsightsMeta(payload.meta);
+      } catch (e) {
+        // ignore, keep client-side computed alerts
+      }
+    };
+
+    void fetchInsights();
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
@@ -134,7 +157,7 @@ export default function FacultyDashboardPage() {
 
       <div className="grid gap-6 md:grid-cols-7">
         <div className="md:col-span-4 lg:col-span-5 space-y-6">
-          <AIAlerts alerts={computedAlerts()} />
+          <AIAlerts alerts={insights ?? computedAlerts()} />
           
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <h3 className="font-semibold text-slate-800 mb-4">My Schedule Today</h3>
@@ -173,6 +196,20 @@ export default function FacultyDashboardPage() {
           <div className="text-3xl font-bold text-emerald-500 my-4">{myAttendance ? myAttendance.status : 'No record'}</div>
           <div className="text-sm text-slate-500">{myAttendance ? `Clocked in at ${myAttendance.timeIn || '—'}` : 'No attendance found for today'}</div>
         </div>
+        {insightsMeta?.latenessSeries && (
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 className="font-semibold text-slate-800 mb-2">Lateness (14d)</h3>
+            <div className="text-sm text-slate-600 mb-2">Recent late arrivals per day</div>
+            <div className="flex gap-2 flex-wrap text-xs text-slate-700">
+              {insightsMeta.latenessSeries.map((s) => (
+                <div key={s.date} className="p-2 bg-slate-50 rounded-md border border-slate-100">
+                  <div className="font-medium">{s.lateCount}</div>
+                  <div className="text-[10px] text-slate-500">{s.date.slice(5)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         </div>
       </div>
     </div>
