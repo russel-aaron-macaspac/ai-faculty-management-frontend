@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { AlertTriangle, FileText, Loader2, ScanLine, Save, UploadCloud, ArrowLeft, Trash2, Bell, CheckCircle2, XCircle } from 'lucide-react';
+import { AlertTriangle, FileText, Loader2, ScanLine, Save, UploadCloud, ArrowLeft, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +19,6 @@ import {
   DocumentValidationResult 
 } from '@/lib/documentTypes';
 import { useClearanceNotifications } from '@/hooks/useClearanceNotifications';
-import { format } from 'date-fns';
 
 type OfficeLocalState = {
   notes: string;
